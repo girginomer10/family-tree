@@ -3,27 +3,40 @@ import type { TreeData } from '../types';
 import { fullName, lifespan } from '../types';
 import { searchPersons } from '../model/queries';
 
+export type ViewMode = 'hourglass' | 'pedigree' | 'descendants' | 'fan';
+
 interface Props {
   data: TreeData;
   canUndo: boolean;
   canRedo: boolean;
   ancestorDepth: number;
   descendantDepth: number;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
   onUndo: () => void;
   onRedo: () => void;
   onRenameTree: (name: string) => void;
   onPickPerson: (id: string) => void;
   onDepthChange: (which: 'anc' | 'desc', value: number) => void;
+  onOpenRelationship: () => void;
   onNewTree: () => void;
   onLoadSample: () => void;
   onImportFile: (file: File) => void;
   onExportJson: () => void;
   onExportGedcom: () => void;
   onExportSvg: () => void;
+  onExportPng: () => void;
 }
 
 const DEPTHS = [1, 2, 3, 4, 5, 99];
 const depthLabel = (n: number) => (n === 99 ? 'All' : String(n));
+
+const VIEW_MODES: { id: ViewMode; icon: string; label: string }[] = [
+  { id: 'hourglass', icon: '⧖', label: 'Hourglass — ancestors & descendants' },
+  { id: 'pedigree', icon: '△', label: 'Pedigree — ancestors only' },
+  { id: 'descendants', icon: '▽', label: 'Descendants only' },
+  { id: 'fan', icon: '◖', label: 'Fan chart — ancestors' },
+];
 
 export function Toolbar(props: Props) {
   const [query, setQuery] = useState('');
@@ -102,32 +115,59 @@ export function Toolbar(props: Props) {
       </div>
 
       <div className="toolbar-right">
-        <label className="depth-select" title="Ancestor generations shown">
-          ↑
-          <select
-            value={props.ancestorDepth}
-            onChange={(e) => props.onDepthChange('anc', parseInt(e.target.value, 10))}
-          >
-            {DEPTHS.map((d) => (
-              <option key={d} value={d}>
-                {depthLabel(d)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="depth-select" title="Descendant generations shown">
-          ↓
-          <select
-            value={props.descendantDepth}
-            onChange={(e) => props.onDepthChange('desc', parseInt(e.target.value, 10))}
-          >
-            {DEPTHS.map((d) => (
-              <option key={d} value={d}>
-                {depthLabel(d)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="view-switch" role="group" aria-label="Chart view">
+          {VIEW_MODES.map((m) => (
+            <button
+              key={m.id}
+              className={props.viewMode === m.id ? 'active' : ''}
+              title={m.label}
+              onClick={() => props.onViewModeChange(m.id)}
+            >
+              {m.icon}
+            </button>
+          ))}
+        </div>
+
+        <span className="divider" />
+
+        {props.viewMode !== 'descendants' && (
+          <label className="depth-select" title="Ancestor generations shown">
+            ↑
+            <select
+              value={props.ancestorDepth}
+              onChange={(e) => props.onDepthChange('anc', parseInt(e.target.value, 10))}
+            >
+              {DEPTHS.map((d) => (
+                <option key={d} value={d}>
+                  {depthLabel(d)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {(props.viewMode === 'hourglass' || props.viewMode === 'descendants') && (
+          <label className="depth-select" title="Descendant generations shown">
+            ↓
+            <select
+              value={props.descendantDepth}
+              onChange={(e) => props.onDepthChange('desc', parseInt(e.target.value, 10))}
+            >
+              {DEPTHS.map((d) => (
+                <option key={d} value={d}>
+                  {depthLabel(d)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <button
+          className="icon-btn"
+          title="Relationship calculator"
+          onClick={props.onOpenRelationship}
+        >
+          ⇄
+        </button>
 
         <span className="divider" />
 
@@ -211,6 +251,14 @@ export function Toolbar(props: Props) {
                 }}
               >
                 Export chart as SVG
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onExportPng();
+                }}
+              >
+                Export chart as PNG
               </button>
             </div>
           )}

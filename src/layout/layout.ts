@@ -67,9 +67,17 @@ export interface LayoutResult {
   shownPersons: number;
 }
 
+export type TreeViewMode = 'hourglass' | 'pedigree' | 'descendants';
+
 export interface LayoutOptions {
   ancestorDepth: number; // generations above focus (1 = parents)
   descendantDepth: number; // generations below focus (1 = children)
+  /**
+   * hourglass: ancestors + descendants + (step)siblings (default)
+   * pedigree: blood ancestors only (classic pedigree chart)
+   * descendants: focus's descendants only
+   */
+  mode?: TreeViewMode;
 }
 
 // --- Internal block model ----------------------------------------------------
@@ -443,8 +451,10 @@ export function computeLayout(data: TreeData, opts: LayoutOptions): LayoutResult
   if (!focus) return empty;
 
   const ctx: BuildCtx = { data, visited: new Set() };
+  const mode = opts.mode ?? 'hourglass';
 
   const parentUnion =
+    mode !== 'descendants' &&
     opts.ancestorDepth >= 1 &&
     focus.unionAsChild &&
     data.unions[focus.unionAsChild]?.partners.length
@@ -461,7 +471,29 @@ export function computeLayout(data: TreeData, opts: LayoutOptions): LayoutResult
   let ancRoot: Block | undefined;
   let descRoot: Block;
 
-  if (parentUnion) {
+  if (parentUnion && mode === 'pedigree') {
+    // classic pedigree: blood ancestors only, focus as a single card below
+    ancRoot = buildAncBlock(ctx, parentUnion, -1, opts.ancestorDepth - 1, focus.id);
+    descRoot = blockOf(-1, ancRoot.cards);
+    descRoot.anchorPersonId = ancRoot.anchorPersonId;
+    ctx.visited.add(focus.id);
+    const fb = blockOf(0, [
+      {
+        personId: focus.id,
+        dx: 0,
+        hasMoreDescendants:
+          hasChildrenAnywhere(ctx, focus.id) || unionsOf(ctx, focus.id).length > 0,
+      },
+    ]);
+    fb.anchorPersonId = focus.id;
+    descRoot.groups.push({
+      marriageDX: descRoot.cards.length >= 2 ? 0 : descRoot.cards[0]?.dx ?? 0,
+      coupleDrop: descRoot.cards.length >= 2,
+      childIdx: [0],
+      groupGapBoundary: false,
+    });
+    descRoot.children.push(fb);
+  } else if (parentUnion) {
     const partners = parentUnion.partners
       .map((id) => data.persons[id])
       .filter(Boolean);
@@ -540,8 +572,14 @@ export function computeLayout(data: TreeData, opts: LayoutOptions): LayoutResult
   walkCards(descRoot);
   if (ancRoot) walkCards(ancRoot, true); // root couple cards already emitted via descRoot
 
+  // descendants-only mode: parents exist but are out of scope -> badge on focus
+  if (mode === 'descendants' && hasParents(ctx, focus.id)) {
+    const fc = cards.find((c) => c.isFocus);
+    if (fc) fc.hasMoreAncestors = true;
+  }
+
   // ghost "+ add parents" card above a parentless focus
-  if (!parentUnion && opts.ancestorDepth >= 1) {
+  if (!parentUnion && mode !== 'descendants' && opts.ancestorDepth >= 1) {
     const gx = descRoot.cx + descRoot.anchorDX;
     cards.push({
       key: 'ghost-parents',

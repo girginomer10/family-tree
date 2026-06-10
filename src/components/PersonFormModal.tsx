@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FuzzyDate, Gender, Person, TreeData } from '../types';
 import { fullName, lifespan } from '../types';
 import type { PersonDraft } from '../model/mutations';
 import { searchPersons } from '../model/queries';
+import { fileToDataUrl } from '../utils/files';
 
 // ---------------------------------------------------------------------------
 // Fuzzy date editor
@@ -146,8 +147,19 @@ export function PersonFormModal({
   const [deathPlace, setDeathPlace] = useState(initial?.death?.place ?? '');
   const [occupation, setOccupation] = useState(initial?.occupation ?? '');
   const [photoUrl, setPhotoUrl] = useState(initial?.photoUrl ?? '');
+  const [photoError, setPhotoError] = useState('');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [query, setQuery] = useState('');
+  const photoFileRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoFile = async (file: File) => {
+    try {
+      setPhotoError('');
+      setPhotoUrl(await fileToDataUrl(file));
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -340,14 +352,43 @@ export function PersonFormModal({
                 onChange={(e) => setOccupation(e.target.value)}
               />
             </div>
-            <div className="form-row">
+            <div className="form-row photo-row">
+              {photoUrl && <img className="photo-preview" src={photoUrl} alt="" />}
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => photoFileRef.current?.click()}
+              >
+                {photoUrl ? 'Change photo…' : 'Upload photo…'}
+              </button>
+              {photoUrl && (
+                <button type="button" className="btn small" onClick={() => setPhotoUrl('')}>
+                  Remove
+                </button>
+              )}
               <input
-                type="url"
-                placeholder="Photo URL (optional)"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
+                ref={photoFileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handlePhotoFile(f);
+                  e.target.value = '';
+                }}
               />
             </div>
+            {photoError && <p className="form-error">{photoError}</p>}
+            {!photoUrl.startsWith('data:') && (
+              <div className="form-row">
+                <input
+                  type="url"
+                  placeholder="…or photo URL"
+                  value={photoUrl}
+                  onChange={(e) => setPhotoUrl(e.target.value)}
+                />
+              </div>
+            )}
             <div className="form-row">
               <textarea
                 placeholder="Notes"

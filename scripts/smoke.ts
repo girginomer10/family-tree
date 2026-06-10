@@ -3,6 +3,8 @@ import { sampleTree } from '../src/data/sample';
 import { validate, getParents, getSiblings, getSpouses, getChildren } from '../src/model/queries';
 import * as M from '../src/model/mutations';
 import { computeLayout, CARD_W, CARD_H } from '../src/layout/layout';
+import { computeFan } from '../src/layout/fan';
+import { relate, bloodRelation, bloodTerm } from '../src/model/kinship';
 import { exportGedcom, importGedcom } from '../src/gedcom/gedcom';
 import { fullName } from '../src/types';
 
@@ -108,6 +110,65 @@ check('no overlaps at deep depth', deepOverlaps === 0);
 const data2 = M.setFocus(data, 'deniz');
 const layout2 = computeLayout(data2, { ancestorDepth: 2, descendantDepth: 2 });
 check('refocus on deniz works (single parent)', layout2.cards.some((c) => c.isFocus && c.personId === 'deniz'));
+
+// ---------- 2b. view modes ----------
+console.log('\n[2b] view modes');
+const ped = computeLayout(data, { ancestorDepth: 3, descendantDepth: 2, mode: 'pedigree' });
+const pedIds = new Set(ped.cards.filter((c) => !c.isGhost).map((c) => c.personId));
+check('pedigree: blood ancestors only', pedIds.has('ahmet') && pedIds.has('elif') && pedIds.has('ibrahim'));
+check('pedigree: no step-mother / siblings / spouse / children',
+  !pedIds.has('zeynep') && !pedIds.has('selin') && !pedIds.has('deniz') && !pedIds.has('ela'));
+check('pedigree: focus badge for hidden family',
+  !!ped.cards.find((c) => c.isFocus)?.hasMoreDescendants);
+const desc = computeLayout(data, { ancestorDepth: 2, descendantDepth: 2, mode: 'descendants' });
+const descIds = new Set(desc.cards.filter((c) => !c.isGhost).map((c) => c.personId));
+check('descendants: no ancestors', !descIds.has('ahmet') && !descIds.has('mehmet'));
+check('descendants: spouse + children render', descIds.has('deniz') && descIds.has('ela') && descIds.has('aras'));
+check('descendants: focus badge for hidden parents', !!desc.cards.find((c) => c.isFocus)?.hasMoreAncestors);
+check('descendants: no ghost card', !desc.cards.some((c) => c.isGhost));
+
+// ---------- 2c. fan chart ----------
+console.log('\n[2c] fan chart');
+const fan = computeFan(data, 'emre', 3);
+check('fan has sectors', fan.sectors.length > 0);
+const fanIds = new Set(fan.sectors.map((s) => s.personId).filter(Boolean));
+check('fan ring1 = parents', fanIds.has('ahmet') && fanIds.has('elif'));
+check('fan ring2 = grandparents', fanIds.has('mehmet') && fanIds.has('fatma') && fanIds.has('hasan') && fanIds.has('ayse'));
+check('fan ring3 includes great-grandparents', fanIds.has('ibrahim') && fanIds.has('hatice'));
+check('fan: no spouse/children in ancestor fan', !fanIds.has('deniz') && !fanIds.has('zeynep'));
+const emptySlots = fan.sectors.filter((s) => !s.personId);
+check('fan: empty add-parent slots exist (unknown ancestors)', emptySlots.length > 0);
+check('fan: empty slots carry childId', emptySlots.every((s) => !!s.childId));
+const fanDeniz = computeFan(data, 'deniz', 3);
+check('fan from deniz: mother + her empty father slot',
+  fanDeniz.sectors.some((s) => s.personId === 'nazli') &&
+  fanDeniz.sectors.some((s) => !s.personId && s.childId === 'deniz'));
+
+// ---------- 2d. kinship ----------
+console.log('\n[2d] kinship');
+const term = (a: string, b: string) => relate(data, a, b).short;
+check('father', term('ahmet', 'emre') === 'father', term('ahmet', 'emre') ?? '');
+check('son', term('emre', 'ahmet') === 'son', term('emre', 'ahmet') ?? '');
+check('grandmother', term('fatma', 'emre') === 'grandmother', term('fatma', 'emre') ?? '');
+check('great-grandfather', term('ibrahim', 'emre') === 'great-grandfather', term('ibrahim', 'emre') ?? '');
+check('full sister', term('selin', 'emre') === 'sister', term('selin', 'emre') ?? '');
+check('half-brother', term('murat', 'emre') === 'half-brother', term('murat', 'emre') ?? '');
+check('uncle', term('mustafa', 'emre') === 'uncle', term('mustafa', 'emre') ?? '');
+check('aunt', term('hulya', 'emre') === 'aunt', term('hulya', 'emre') ?? '');
+check('nephew', term('emre', 'hulya') === 'nephew', term('emre', 'hulya') ?? '');
+check('first cousin', term('cem', 'emre') === 'first cousin', term('cem', 'emre') ?? '');
+check('first cousin once removed', term('cem', 'ela') === 'first cousin once removed', term('cem', 'ela') ?? '');
+check('wife', term('deniz', 'emre') === 'wife', term('deniz', 'emre') ?? '');
+check('ex-wife', term('zeynep', 'ahmet') === 'ex-wife', term('zeynep', 'ahmet') ?? '');
+check('granddaughter', term('ela', 'ahmet') === 'granddaughter', term('ela', 'ahmet') ?? '');
+const inLaw = relate(data, 'can', 'emre');
+check('brother-in-law via spouse composition', inLaw.short === 'husband of sister', inLaw.short ?? '');
+const viaB = relate(data, 'nazli', 'emre');
+check("mother of spouse", viaB.short === "mother of Emre Yılmaz's wife", viaB.short ?? '');
+const chain = relate(data, 'nazli', 'mehmet').chain;
+check('distant chain exists', !!chain && chain.length >= 4);
+check('unrelated blood is null', bloodRelation(data, 'can', 'deniz') === null);
+check('bloodTerm second cousin', bloodTerm({ a: 3, b: 3, commonAncestors: ['x'] }, 'F') === 'second cousin');
 
 // ---------- 3. mutations ----------
 console.log('\n[3] mutations');

@@ -779,3 +779,147 @@ button.rel-link:hover {
   padding: 8px 10px;
   font-size: 13.5px;
 }
+
+/* ---------- view switcher ---------- */
+
+.view-switch {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.view-switch button {
+  border: 0;
+  background: var(--panel);
+  width: 34px;
+  height: 30px;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.view-switch button + button {
+  border-left: 1px solid var(--line);
+}
+.view-switch button:hover {
+  background: var(--accent-soft);
+}
+.view-switch button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- relation chip ---------- */
+
+.relation-chip {
+  align-self: flex-start;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 99px;
+  padding: 3px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.relation-chip:hover {
+  background: #e0ddf5;
+}
+
+/* ---------- relationship modal ---------- */
+
+.rel-pickers {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.rel-arrow {
+  color: var(--muted);
+  padding-top: 9px;
+  flex: none;
+}
+.picker {
+  flex: 1;
+  min-width: 0;
+}
+.picker input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+}
+.picker-value {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.picker-value:hover {
+  border-color: var(--accent);
+}
+.picker-value span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.search-results.compact {
+  min-height: 0;
+  max-height: 180px;
+}
+.rel-sentence {
+  font-size: 14.5px;
+  line-height: 1.5;
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.rel-sentence.muted {
+  background: var(--bg);
+  color: var(--muted);
+}
+.chain {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  border-left: 2px solid var(--line);
+  margin-left: 10px;
+}
+.chain li {
+  padding-left: 8px;
+}
+
+/* ---------- photo upload ---------- */
+
+.photo-row {
+  align-items: center;
+}
+.photo-preview {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.form-error {
+  color: var(--danger);
+  font-size: 12.5px;
+  margin: -4px 0 8px;
+}
+
+.icon-btn.order {
+  font-size: 11px;
+  width: 20px;
+}

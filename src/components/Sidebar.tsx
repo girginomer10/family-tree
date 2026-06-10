@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Person, TreeData, Union } from '../types';
 import { formatDate, fullName, lifespan } from '../types';
 import { getParents, getSiblings, getUnionsOf } from '../model/queries';
+import { relate } from '../model/kinship';
 
 const STATUS_LABEL: Record<string, string> = {
   married: 'married',
@@ -25,6 +26,8 @@ interface Props {
   onEditUnion: (union: Union) => void;
   onUnlinkPartner: (unionId: string, personId: string) => void;
   onUnlinkChild: (childId: string) => void;
+  onReorderChild: (childId: string, dir: -1 | 1) => void;
+  onOpenRelationship: () => void;
   onDelete: () => void;
   onClose: () => void;
 }
@@ -93,6 +96,14 @@ export function Sidebar(props: Props) {
   const siblings = getSiblings(data, person.id);
   const isFocus = data.focusId === person.id;
 
+  // kinship chip: how this person relates to the focus person
+  const relationChip = useMemo(() => {
+    if (isFocus || !data.focusId || !data.persons[data.focusId]) return null;
+    const r = relate(data, person.id, data.focusId);
+    if (!r.short) return null;
+    return `${r.short} of ${data.persons[data.focusId].givenName || 'focus'}`;
+  }, [data, person.id, isFocus]);
+
   const facts: [string, string][] = [];
   if (person.birth?.date || person.birth?.place) {
     facts.push([
@@ -130,6 +141,16 @@ export function Sidebar(props: Props) {
           ✕
         </button>
       </div>
+
+      {relationChip && (
+        <button
+          className="relation-chip"
+          title="Open relationship calculator"
+          onClick={props.onOpenRelationship}
+        >
+          ✦ {relationChip}
+        </button>
+      )}
 
       <div className="sidebar-actions">
         {!isFocus && (
@@ -241,19 +262,41 @@ export function Sidebar(props: Props) {
                   {u.children
                     .map((id) => data.persons[id])
                     .filter(Boolean)
-                    .map((c) => (
+                    .map((c, ci, arr) => (
                       <PersonRow
                         key={c!.id}
                         person={c!}
                         onSelect={onSelect}
                         action={
-                          <TwoStep
-                            label="✕"
-                            confirmLabel="unlink?"
-                            className="icon-btn danger"
-                            title="Detach this child from these parents"
-                            onConfirm={() => props.onUnlinkChild(c!.id)}
-                          />
+                          <span className="row-actions">
+                            {arr.length > 1 && (
+                              <>
+                                <button
+                                  className="icon-btn order"
+                                  title="Move up among siblings"
+                                  disabled={ci === 0}
+                                  onClick={() => props.onReorderChild(c!.id, -1)}
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  className="icon-btn order"
+                                  title="Move down among siblings"
+                                  disabled={ci === arr.length - 1}
+                                  onClick={() => props.onReorderChild(c!.id, 1)}
+                                >
+                                  ↓
+                                </button>
+                              </>
+                            )}
+                            <TwoStep
+                              label="✕"
+                              confirmLabel="unlink?"
+                              className="icon-btn danger"
+                              title="Detach this child from these parents"
+                              onConfirm={() => props.onUnlinkChild(c!.id)}
+                            />
+                          </span>
                         }
                       />
                     ))}

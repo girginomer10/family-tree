@@ -7,12 +7,14 @@ import * as M from './model/mutations';
 import { getUnionsOf, validate } from './model/queries';
 import { sampleTree } from './data/sample';
 import { exportGedcom, importGedcom } from './gedcom/gedcom';
-import { downloadText, exportSvg, readFileAsText } from './utils/files';
-import { Toolbar } from './components/Toolbar';
+import { downloadBlob, downloadText, exportSvg, readFileAsText, svgToPng } from './utils/files';
+import { Toolbar, type ViewMode } from './components/Toolbar';
 import { TreeCanvas, type TreeCanvasHandle } from './components/TreeCanvas';
+import { FanChartView } from './components/FanChartView';
 import { Sidebar } from './components/Sidebar';
 import { PersonFormModal, type UnionOption } from './components/PersonFormModal';
 import { UnionModal } from './components/UnionModal';
+import { RelationshipModal } from './components/RelationshipModal';
 
 type ModalState =
   | { kind: 'none' }
@@ -22,11 +24,13 @@ type ModalState =
   | { kind: 'add-child'; personId: string }
   | { kind: 'add-parent'; personId: string }
   | { kind: 'add-sibling'; personId: string }
-  | { kind: 'edit-union'; union: Union };
+  | { kind: 'edit-union'; union: Union }
+  | { kind: 'relationship' };
 
-interface Depths {
+interface ViewSettings {
   anc: number;
   desc: number;
+  mode: ViewMode;
 }
 
 const DEPTH_KEY = 'family-tree-depths-v1';
@@ -37,21 +41,28 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(data.focusId);
   const [modal, setModal] = useState<ModalState>({ kind: 'none' });
   const [banner, setBanner] = useState<string | null>(null);
-  const [depths, setDepths] = useState<Depths>(() => {
+  const [view, setView] = useState<ViewSettings>(() => {
+    const fallback: ViewSettings = { anc: 2, desc: 2, mode: 'hourglass' };
     try {
       const raw = localStorage.getItem(DEPTH_KEY);
-      if (raw) return JSON.parse(raw) as Depths;
+      if (raw) return { ...fallback, ...(JSON.parse(raw) as Partial<ViewSettings>) };
     } catch {
       /* default below */
     }
-    return { anc: 2, desc: 2 };
+    return fallback;
   });
   const canvasRef = useRef<TreeCanvasHandle>(null);
 
   const layout = useMemo(
-    () => computeLayout(data, { ancestorDepth: depths.anc, descendantDepth: depths.desc }),
-    [data, depths],
+    () =>
+      computeLayout(data, {
+        ancestorDepth: view.anc,
+        descendantDepth: view.desc,
+        mode: view.mode === 'fan' ? 'hourglass' : view.mode,
+      }),
+    [data, view],
   );
+  const fanRings = Math.max(1, Math.min(view.anc, 6));
 
   // keep selection valid
   const selected = selectedId ? data.persons[selectedId] : undefined;
@@ -61,18 +72,18 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DEPTH_KEY, JSON.stringify(depths));
+      localStorage.setItem(DEPTH_KEY, JSON.stringify(view));
     } catch {
       /* non-fatal */
     }
-  }, [depths]);
+  }, [view]);
 
-  // fit view when the focus person or depth settings change
+  // fit view when the focus person or view settings change
   const focusId = data.focusId;
   useEffect(() => {
     const t = requestAnimationFrame(() => canvasRef.current?.fit());
     return () => cancelAnimationFrame(t);
-  }, [focusId, depths]);
+  }, [focusId, view]);
 
   // keyboard shortcuts
   useEffect(() => {
@@ -117,7 +128,10 @@ export default function App() {
   };
 
   const modalPerson =
-    modal.kind !== 'none' && modal.kind !== 'add-first' && modal.kind !== 'edit-union'
+    modal.kind !== 'none' &&
+    modal.kind !== 'add-first' &&
+    modal.kind !== 'edit-union' &&
+    modal.kind !== 'relationship'
       ? data.persons[modal.personId]
       : undefined;
 
@@ -174,21 +188,41 @@ export default function App() {
 
   const safeName = data.name.replace(/[^\w-]+/g, '_') || 'family_tree';
 
+  const handleExportPng = async () => {
+    const svg = canvasRef.current?.getSvgElement();
+    const bounds = canvasRef.current?.getViewBounds();
+    if (!svg || !bounds) return;
+    try {
+      const pad = 40;
+      const w = bounds.maxX - bounds.minX + pad * 2;
+      const h = bounds.maxY - bounds.minY + pad * 2;
+      const blob = await svgToPng(exportSvg(svg, bounds), w, h, 2);
+      downloadBlob(`${safeName}.png`, blob);
+    } catch {
+      showBanner(
+        'PNG export failed — photos from external URLs block rasterization. Use SVG export, or upload photos as files instead.',
+      );
+    }
+  };
+
   return (
     <div className="app">
       <Toolbar
         data={data}
         canUndo={store.canUndo}
         canRedo={store.canRedo}
-        ancestorDepth={depths.anc}
-        descendantDepth={depths.desc}
+        ancestorDepth={view.anc}
+        descendantDepth={view.desc}
+        viewMode={view.mode}
+        onViewModeChange={(mode) => setView((v) => ({ ...v, mode }))}
         onUndo={store.undo}
         onRedo={store.redo}
         onRenameTree={(name) => store.applyTransient(M.renameTree(data, name))}
         onPickPerson={centerOn}
         onDepthChange={(which, value) =>
-          setDepths((d) => ({ ...d, [which]: value }))
+          setView((v) => ({ ...v, [which]: value }))
         }
+        onOpenRelationship={() => setModal({ kind: 'relationship' })}
         onNewTree={() => {
           store.replace(emptyTree());
           setSelectedId(null);
@@ -208,6 +242,7 @@ export default function App() {
           const bounds = canvasRef.current?.getViewBounds();
           if (svg && bounds) downloadText(`${safeName}.svg`, exportSvg(svg, bounds), 'image/svg+xml');
         }}
+        onExportPng={() => void handleExportPng()}
       />
 
       {banner && <div className="banner">{banner}</div>}
@@ -234,6 +269,18 @@ export default function App() {
               </button>
             </div>
           </div>
+        ) : view.mode === 'fan' && data.focusId ? (
+          <FanChartView
+            ref={canvasRef}
+            data={data}
+            focusId={data.focusId}
+            rings={fanRings}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onFocus={centerOn}
+            onAddParent={(childId) => setModal({ kind: 'add-parent', personId: childId })}
+            onBackgroundClick={() => setSelectedId(null)}
+          />
         ) : (
           <TreeCanvas
             ref={canvasRef}
@@ -265,6 +312,8 @@ export default function App() {
               store.apply(M.unlinkPartner(data, unionId, personId))
             }
             onUnlinkChild={(childId) => store.apply(M.unlinkChild(data, childId))}
+            onReorderChild={(childId, dir) => store.apply(M.reorderChild(data, childId, dir))}
+            onOpenRelationship={() => setModal({ kind: 'relationship' })}
             onDelete={() => {
               store.apply(M.deletePerson(data, selected.id));
               setSelectedId(null);
@@ -363,6 +412,16 @@ export default function App() {
             setModal({ kind: 'none' });
           }}
           onCancel={() => setModal({ kind: 'none' })}
+        />
+      )}
+
+      {modal.kind === 'relationship' && (
+        <RelationshipModal
+          data={data}
+          initialA={selectedId && selectedId !== data.focusId ? selectedId : null}
+          initialB={data.focusId}
+          onSelect={(id) => setSelectedId(id)}
+          onClose={() => setModal({ kind: 'none' })}
         />
       )}
     </div>

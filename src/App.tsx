@@ -11,6 +11,8 @@ import { downloadBlob, downloadText, exportSvg, readFileAsText, svgToPng } from 
 import { Toolbar, type ViewMode } from './components/Toolbar';
 import { TreeCanvas, type TreeCanvasHandle } from './components/TreeCanvas';
 import { FanChartView } from './components/FanChartView';
+import { TimelineView } from './components/TimelineView';
+import { StatsModal } from './components/StatsModal';
 import { Sidebar } from './components/Sidebar';
 import { PersonFormModal, type UnionOption } from './components/PersonFormModal';
 import { UnionModal } from './components/UnionModal';
@@ -25,7 +27,8 @@ type ModalState =
   | { kind: 'add-parent'; personId: string }
   | { kind: 'add-sibling'; personId: string }
   | { kind: 'edit-union'; union: Union }
-  | { kind: 'relationship' };
+  | { kind: 'relationship' }
+  | { kind: 'stats' };
 
 interface ViewSettings {
   anc: number;
@@ -58,7 +61,7 @@ export default function App() {
       computeLayout(data, {
         ancestorDepth: view.anc,
         descendantDepth: view.desc,
-        mode: view.mode === 'fan' ? 'hourglass' : view.mode,
+        mode: view.mode === 'fan' || view.mode === 'timeline' ? 'hourglass' : view.mode,
       }),
     [data, view],
   );
@@ -131,7 +134,8 @@ export default function App() {
     modal.kind !== 'none' &&
     modal.kind !== 'add-first' &&
     modal.kind !== 'edit-union' &&
-    modal.kind !== 'relationship'
+    modal.kind !== 'relationship' &&
+    modal.kind !== 'stats'
       ? data.persons[modal.personId]
       : undefined;
 
@@ -162,10 +166,10 @@ export default function App() {
           showBanner('Import failed: no individuals found in the GEDCOM file.');
           return;
         }
-        store.replace(imported);
+        store.createTree(imported);
         setSelectedId(imported.focusId);
         showBanner(
-          `Imported ${Object.keys(imported.persons).length} people` +
+          `Imported ${Object.keys(imported.persons).length} people into a new tree` +
             (warnings.length ? ` — ${warnings.length} warning(s), see console.` : '.'),
         );
         if (warnings.length) console.warn('GEDCOM import warnings:', warnings);
@@ -177,9 +181,11 @@ export default function App() {
         if (!parsed.focusId || !parsed.persons[parsed.focusId]) {
           parsed.focusId = Object.keys(parsed.persons)[0] ?? null;
         }
-        store.replace(parsed);
+        store.createTree(parsed);
         setSelectedId(parsed.focusId);
-        showBanner(`Imported ${Object.keys(parsed.persons).length} people from JSON.`);
+        showBanner(
+          `Imported ${Object.keys(parsed.persons).length} people from JSON into a new tree.`,
+        );
       }
     } catch (err) {
       showBanner(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -209,6 +215,8 @@ export default function App() {
     <div className="app">
       <Toolbar
         data={data}
+        trees={store.trees}
+        currentTreeId={store.currentTreeId}
         canUndo={store.canUndo}
         canRedo={store.canRedo}
         ancestorDepth={view.anc}
@@ -223,13 +231,22 @@ export default function App() {
           setView((v) => ({ ...v, [which]: value }))
         }
         onOpenRelationship={() => setModal({ kind: 'relationship' })}
+        onOpenStats={() => setModal({ kind: 'stats' })}
+        onSwitchTree={(id) => {
+          store.switchTree(id);
+          setSelectedId(null);
+        }}
         onNewTree={() => {
-          store.replace(emptyTree());
+          store.createTree(emptyTree('New Tree'));
+          setSelectedId(null);
+        }}
+        onDeleteTree={(id) => {
+          store.deleteTree(id);
           setSelectedId(null);
         }}
         onLoadSample={() => {
           const s = sampleTree();
-          store.replace(s);
+          store.createTree(s);
           setSelectedId(s.focusId);
         }}
         onImportFile={handleImportFile}
@@ -269,6 +286,15 @@ export default function App() {
               </button>
             </div>
           </div>
+        ) : view.mode === 'timeline' ? (
+          <TimelineView
+            ref={canvasRef}
+            data={data}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onFocus={centerOn}
+            onBackgroundClick={() => setSelectedId(null)}
+          />
         ) : view.mode === 'fan' && data.focusId ? (
           <FanChartView
             ref={canvasRef}
@@ -312,6 +338,9 @@ export default function App() {
               store.apply(M.unlinkPartner(data, unionId, personId))
             }
             onUnlinkChild={(childId) => store.apply(M.unlinkChild(data, childId))}
+            onSetChildRel={(unionId, childId, rel) =>
+              store.apply(M.setChildRel(data, unionId, childId, rel))
+            }
             onReorderChild={(childId, dir) => store.apply(M.reorderChild(data, childId, dir))}
             onOpenRelationship={() => setModal({ kind: 'relationship' })}
             onDelete={() => {
@@ -413,6 +442,10 @@ export default function App() {
           }}
           onCancel={() => setModal({ kind: 'none' })}
         />
+      )}
+
+      {modal.kind === 'stats' && (
+        <StatsModal data={data} onSelect={(id) => setSelectedId(id)} onClose={() => setModal({ kind: 'none' })} />
       )}
 
       {modal.kind === 'relationship' && (

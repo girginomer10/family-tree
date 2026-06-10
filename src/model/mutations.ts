@@ -1,4 +1,4 @@
-import type { Gender, Person, TreeData, Union, UnionStatus } from '../types';
+import type { ChildRelType, Gender, Person, TreeData, Union, UnionStatus } from '../types';
 import { newId } from '../types';
 
 /**
@@ -175,6 +175,27 @@ export function updateUnion(
   return next;
 }
 
+/** Set how a child relates to its parent union (birth/adopted/step/foster). */
+export function setChildRel(
+  data: TreeData,
+  unionId: string,
+  childId: string,
+  rel: ChildRelType,
+): TreeData {
+  const next = clone(data);
+  const u = next.unions[unionId];
+  if (!u || !u.children.includes(childId)) return data;
+  if (rel === 'birth') {
+    if (u.childRels) {
+      delete u.childRels[childId];
+      if (Object.keys(u.childRels).length === 0) delete u.childRels;
+    }
+  } else {
+    u.childRels = { ...u.childRels, [childId]: rel };
+  }
+  return next;
+}
+
 /** Move a child one position earlier/later among its siblings. */
 export function reorderChild(data: TreeData, childId: string, dir: -1 | 1): TreeData {
   const next = clone(data);
@@ -226,7 +247,10 @@ export function unlinkChild(data: TreeData, childId: string): TreeData {
   const c = next.persons[childId];
   if (!c?.unionAsChild) return data;
   const u = next.unions[c.unionAsChild];
-  if (u) u.children = u.children.filter((x) => x !== childId);
+  if (u) {
+    u.children = u.children.filter((x) => x !== childId);
+    if (u.childRels) delete u.childRels[childId];
+  }
   const unionId = c.unionAsChild;
   delete c.unionAsChild;
   pruneUnionIfEmpty(next, unionId);
@@ -247,7 +271,10 @@ export function deletePerson(data: TreeData, id: string): TreeData {
   }
   if (p.unionAsChild) {
     const u = next.unions[p.unionAsChild];
-    if (u) u.children = u.children.filter((x) => x !== id);
+    if (u) {
+      u.children = u.children.filter((x) => x !== id);
+      if (u.childRels) delete u.childRels[id];
+    }
     pruneUnionIfEmpty(next, p.unionAsChild);
   }
   delete next.persons[id];

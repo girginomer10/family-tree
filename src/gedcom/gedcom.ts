@@ -1,5 +1,14 @@
-import type { FuzzyDate, Gender, LifeEvent, Person, TreeData, Union, UnionStatus } from '../types';
-import { emptyTree } from '../types';
+import type {
+  ChildRelType,
+  FuzzyDate,
+  Gender,
+  LifeEvent,
+  Person,
+  TreeData,
+  Union,
+  UnionStatus,
+} from '../types';
+import { childRelOf, emptyTree } from '../types';
 
 /**
  * GEDCOM 5.5.1 import/export (UTF-8), minimal-but-correct subset:
@@ -125,6 +134,7 @@ export function importGedcom(text: string, name = 'Imported Tree'): GedcomImport
   const warnings: string[] = [];
   const roots = parseNodes(text);
   const data = emptyTree(name);
+  const pedi = new Map<string, ChildRelType>();
 
   // Pass 1: INDI -> Person
   for (const r of roots) {
@@ -158,6 +168,11 @@ export function importGedcom(text: string, name = 'Imported Tree'): GedcomImport
     if (occu) person.occupation = occu;
     const note = childValue(r, 'NOTE');
     if (note) person.notes = note;
+    const famcNode = child(r, 'FAMC');
+    const pediVal = famcNode ? childValue(famcNode, 'PEDI')?.toLowerCase() : undefined;
+    if (pediVal === 'adopted' || pediVal === 'foster' || pediVal === 'step') {
+      pedi.set(r.xref, pediVal as ChildRelType);
+    }
     if (data.persons[person.id]) warnings.push(`Duplicate INDI @${person.id}@ — kept first`);
     else data.persons[person.id] = person;
   }
@@ -214,6 +229,8 @@ export function importGedcom(text: string, name = 'Imported Tree'): GedcomImport
         u.children = u.children.filter((x) => x !== cid);
       } else {
         c.unionAsChild = u.id;
+        const rel = pedi.get(cid);
+        if (rel) u.childRels = { ...u.childRels, [cid]: rel };
       }
     }
   }
@@ -269,8 +286,11 @@ export function exportGedcom(data: TreeData): string {
       out(1, 'NOTE', head);
       for (const r of rest) out(2, 'CONT', r);
     }
-    if (p.unionAsChild && fid.has(p.unionAsChild))
+    if (p.unionAsChild && fid.has(p.unionAsChild)) {
       out(1, 'FAMC', `@${fid.get(p.unionAsChild)}@`);
+      const rel = childRelOf(data.unions[p.unionAsChild], p.id);
+      if (rel !== 'birth') out(2, 'PEDI', rel);
+    }
     for (const f of p.unionsAsPartner) {
       if (fid.has(f)) out(1, 'FAMS', `@${fid.get(f)}@`);
     }

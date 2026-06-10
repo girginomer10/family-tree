@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import type { Person, TreeData, Union } from '../types';
-import { formatDate, fullName, lifespan } from '../types';
+import type { ChildRelType, Person, TreeData, Union } from '../types';
+import { childRelOf, formatDate, fullName, lifespan } from '../types';
 import { getParents, getSiblings, getUnionsOf } from '../model/queries';
 import { relate } from '../model/kinship';
+
+const CHILD_REL_CYCLE: ChildRelType[] = ['birth', 'adopted', 'step', 'foster'];
 
 const STATUS_LABEL: Record<string, string> = {
   married: 'married',
@@ -26,6 +28,7 @@ interface Props {
   onEditUnion: (union: Union) => void;
   onUnlinkPartner: (unionId: string, personId: string) => void;
   onUnlinkChild: (childId: string) => void;
+  onSetChildRel: (unionId: string, childId: string, rel: ChildRelType) => void;
   onReorderChild: (childId: string, dir: -1 | 1) => void;
   onOpenRelationship: () => void;
   onDelete: () => void;
@@ -266,9 +269,28 @@ export function Sidebar(props: Props) {
                       <PersonRow
                         key={c!.id}
                         person={c!}
+                        hint={
+                          childRelOf(u, c!.id) !== 'birth' ? childRelOf(u, c!.id) : lifespan(c!)
+                        }
                         onSelect={onSelect}
                         action={
                           <span className="row-actions">
+                            <button
+                              className={`icon-btn rel-type ${
+                                childRelOf(u, c!.id) !== 'birth' ? 'set' : ''
+                              }`}
+                              title={`Child relationship: ${childRelOf(u, c!.id)} — click to change`}
+                              onClick={() => {
+                                const cur = CHILD_REL_CYCLE.indexOf(childRelOf(u, c!.id));
+                                props.onSetChildRel(
+                                  u.id,
+                                  c!.id,
+                                  CHILD_REL_CYCLE[(cur + 1) % CHILD_REL_CYCLE.length],
+                                );
+                              }}
+                            >
+                              {childRelOf(u, c!.id) === 'birth' ? '☉' : '◌'}
+                            </button>
                             {arr.length > 1 && (
                               <>
                                 <button

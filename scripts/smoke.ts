@@ -4,9 +4,11 @@ import { validate, getParents, getSiblings, getSpouses, getChildren } from '../s
 import * as M from '../src/model/mutations';
 import { computeLayout, CARD_W, CARD_H } from '../src/layout/layout';
 import { computeFan } from '../src/layout/fan';
+import { computeTimeline } from '../src/layout/timeline';
 import { relate, bloodRelation, bloodTerm } from '../src/model/kinship';
+import { computeStats } from '../src/model/stats';
 import { exportGedcom, importGedcom } from '../src/gedcom/gedcom';
-import { fullName } from '../src/types';
+import { childRelOf, fullName } from '../src/types';
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = '') {
@@ -169,6 +171,50 @@ const chain = relate(data, 'nazli', 'mehmet').chain;
 check('distant chain exists', !!chain && chain.length >= 4);
 check('unrelated blood is null', bloodRelation(data, 'can', 'deniz') === null);
 check('bloodTerm second cousin', bloodTerm({ a: 3, b: 3, commonAncestors: ['x'] }, 'F') === 'second cousin');
+
+// ---------- 2e. child relationship types ----------
+console.log('\n[2e] child relationship types (adopted/step/foster)');
+let dRel = sampleTree();
+dRel = M.setChildRel(dRel, 'u_ae', 'selin', 'adopted');
+check('setChildRel validates', validate(dRel).length === 0);
+check('childRelOf reads back', childRelOf(dRel.unions['u_ae'], 'selin') === 'adopted');
+check('default is birth', childRelOf(dRel.unions['u_ae'], 'emre') === 'birth');
+const relLayout = computeLayout(dRel, { ancestorDepth: 2, descendantDepth: 2 });
+check('adopted child stub is dashed', relLayout.links.some((l) => l.kind === 'tree' && l.dashed));
+const gedRel = exportGedcom(dRel);
+check('GEDCOM emits PEDI adopted', /1 FAMC @F\d+@\n2 PEDI adopted/.test(gedRel));
+const reRel = importGedcom(gedRel);
+const selin2 = Object.values(reRel.data.persons).find((p) => p.givenName === 'Selin' && p.surname === 'Yılmaz');
+check(
+  'PEDI survives round-trip',
+  !!selin2?.unionAsChild && childRelOf(reRel.data.unions[selin2.unionAsChild], selin2.id) === 'adopted',
+);
+dRel = M.setChildRel(dRel, 'u_ae', 'selin', 'birth');
+check('reset to birth removes childRels', dRel.unions['u_ae'].childRels === undefined);
+
+// ---------- 2f. timeline ----------
+console.log('\n[2f] timeline');
+const tl = computeTimeline(data, 2026);
+check('timeline rows for all dated persons', tl.rows.length === 22, `rows=${tl.rows.length}`);
+check('timeline sorted by birth', tl.rows[0].personId === 'ibrahim');
+const emreRow = tl.rows.find((r) => r.personId === 'emre');
+check('living bar extends to now', !!emreRow && emreRow.living && emreRow.years === '1985–');
+const mehmetRow = tl.rows.find((r) => r.personId === 'mehmet');
+check('deceased bar ends at death', !!mehmetRow && !mehmetRow.living && mehmetRow.years === '1928–1995');
+check('marriage markers present', tl.rows.some((r) => r.markers.length > 0));
+check('decade ticks span range', tl.ticks[0].year === 1900 && tl.ticks[tl.ticks.length - 1].year === 2030);
+
+// ---------- 2g. stats ----------
+console.log('\n[2g] stats');
+const st = computeStats(data, 2026);
+check('stats total', st.total === 22);
+check('stats unions', st.unions === 9);
+check('stats deceased', st.deceased === 5, `deceased=${st.deceased}`);
+check('stats avg lifespan computed', st.avgLifespan != null && st.avgLifespan > 60);
+check('stats top surname Yılmaz', st.topSurnames[0]?.name === 'Yılmaz');
+check('stats longest life', st.longestLife?.name === 'Fatma Yılmaz', st.longestLife?.name ?? '');
+check('stats earliest birth İbrahim', st.earliestBirth?.year === 1900);
+check('stats decades histogram', st.birthsPerDecade.length > 5);
 
 // ---------- 3. mutations ----------
 console.log('\n[3] mutations');

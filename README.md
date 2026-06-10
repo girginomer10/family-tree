@@ -12,9 +12,10 @@ npx tsx scripts/smoke.ts   # logic smoke tests (model, layout, GEDCOM round-trip
 
 ## Features
 
-- **Four chart views** (toolbar switcher): **Hourglass** (ancestors + descendants +
-  siblings), **Pedigree** (blood ancestors only), **Descendants**, and a **Fan chart**
-  (240° ancestor fan, branch-colored, with "+" sectors to add unknown ancestors in place).
+- **Five chart views** (toolbar switcher): **Hourglass** (ancestors + descendants +
+  siblings), **Pedigree** (blood ancestors only), **Descendants**, a **Fan chart**
+  (240° ancestor fan, branch-colored, with "+" sectors to add unknown ancestors in
+  place), and a **Timeline** (lifespan bars over a decade grid with marriage markers).
 - **Hourglass chart** centered on a focus person: ancestors above (pedigree), descendants
   below, the focus's siblings and half-siblings on the focus row. Click a card to select,
   double-click (or use the side panel) to re-center the tree on that person.
@@ -22,6 +23,13 @@ npx tsx scripts/smoke.ts   # logic smoke tests (model, layout, GEDCOM round-trip
   "great-grandmother", "first cousin once removed", in-law composition ("husband of
   sister") — plus a clickable link chain for distant connections. The side panel shows
   every selected person's relation to the focus automatically.
+- **Statistics dashboard** (◫): totals, living/deceased, average lifespan, longest life,
+  births-per-decade histogram, top surnames/given names/birth places.
+- **Multiple trees**: the ▾ menu next to the tree name switches, creates, and deletes
+  independent trees; file imports land in a new tree instead of overwriting.
+- **Adoption/step/foster children**: per-union child relationship types (cycle the ☉/◌
+  toggle on a child row); non-birth links draw as dashed connectors and round-trip
+  through GEDCOM as `PEDI`.
 - **Couples drawn side by side**; children hang off the *union* (marriage), not an
   individual. Multiple marriages, half-siblings, and unknown parents all render correctly;
   divorced/separated unions get a dashed spouse line.
@@ -47,15 +55,18 @@ src/
     mutations.ts         Pure edit operations; every one keeps person<->union refs bidirectional
     queries.ts           Traversals (parents/spouses/children/siblings), search, validate()
     kinship.ts           Relationship calculator (common-ancestor terms, in-law composition, BFS chain)
+    stats.ts             Tree statistics (lifespans, decades, top names/places)
   layout/
     layout.ts            Tree layout engine, 3 modes: hourglass / pedigree / descendants
     fan.ts               Ancestor fan chart geometry (ahnentafel slots -> SVG sectors)
+    timeline.ts          Lifespan-bar timeline layout (decade grid, marriage markers)
   gedcom/gedcom.ts       GEDCOM 5.5.1 import (FAM records authoritative) and export
-  store/useTreeStore.ts  useReducer store: undo/redo history + localStorage autosave
+  store/useTreeStore.ts  Multi-tree store: tree index + per-tree localStorage autosave,
+                         per-session undo/redo history
   data/sample.ts         Demo family
   utils/files.ts         Download/read files, SVG serialization, SVG->PNG, photo downscaling
   components/            Toolbar, ZoomCanvas (shared pan/zoom), TreeCanvas, FanChartView,
-                         PersonCard, Sidebar, person/union/relationship modals
+                         TimelineView, PersonCard, Sidebar, person/union/relationship/stats modals
 scripts/smoke.ts         Headless checks: model invariants, layout overlap tests, GEDCOM round-trip
 ```
 
@@ -103,9 +114,8 @@ assigned by gender. Round-trip is covered in `scripts/smoke.ts`.
 
 - Aunts/uncles/cousins are intentionally out of hourglass scope (badges + refocus reach
   them). A "descendants of ancestors" toggle would widen the view.
-- Possible next features: timeline & statistics views, map of life events, per-child
-  adoption/step flags (model supports adding `ChildRef` types), multi-tree management,
-  fan-chart data-completeness overlay, PDF export.
+- Possible next features: map of life events, fan-chart data-completeness overlay,
+  PDF export, drag-to-reorder siblings, merge/duplicate-person detection across imports.
 - `newId()` is timestamp+random based; collisions across import/merge are not handled
   (GEDCOM import keeps file xrefs, JSON import keeps stored ids).
 - PNG export rasterizes the live SVG; photos from remote URLs taint the canvas and make

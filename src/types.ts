@@ -52,6 +52,9 @@ export type UnionStatus =
   | 'widowed'
   | 'unknown';
 
+/** How a child is related to the union's partners (default: birth). */
+export type ChildRelType = 'birth' | 'adopted' | 'step' | 'foster';
+
 export interface Union {
   id: string;
   /** 1 or 2 person ids. A single partner means the other parent is unknown. */
@@ -61,6 +64,12 @@ export interface Union {
   divorce?: LifeEvent;
   /** Child person ids, in sibling display order. */
   children: string[];
+  /** Non-birth child relationships, keyed by child id (absent = birth). */
+  childRels?: Record<string, ChildRelType>;
+}
+
+export function childRelOf(u: Union, childId: string): ChildRelType {
+  return u.childRels?.[childId] ?? 'birth';
 }
 
 export interface TreeData {

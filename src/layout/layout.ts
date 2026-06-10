@@ -1,4 +1,5 @@
 import type { TreeData, Union } from '../types';
+import { childRelOf } from '../types';
 
 /**
  * Hourglass layout engine.
@@ -96,6 +97,10 @@ interface ChildGroup {
   coupleDrop: boolean; // drop starts at row center (between a couple) vs card bottom
   childIdx: number[]; // indexes into block.children
   groupGapBoundary: boolean; // first child of a non-first union group
+  /** Union the children belong to (for adopted/step dashed stubs). */
+  unionId?: string;
+  /** Whole connector dashed (ancestor-side non-birth link). */
+  dashed?: boolean;
 }
 
 interface Block {
@@ -325,6 +330,7 @@ function buildDescBlock(
       coupleDrop: couple,
       childIdx: [],
       groupGapBoundary: !firstGroup,
+      unionId: u.id,
     };
     for (const childId of u.children) {
       if (!ctx.data.persons[childId]) continue;
@@ -413,6 +419,7 @@ function buildAncBlock(
       coupleDrop: false,
       childIdx: [b.children.length],
       groupGapBoundary: false,
+      dashed: childRelOf(pu, slot.personId) !== 'birth',
     });
     b.children.push(parentBlock);
   }
@@ -491,6 +498,7 @@ export function computeLayout(data: TreeData, opts: LayoutOptions): LayoutResult
       coupleDrop: descRoot.cards.length >= 2,
       childIdx: [0],
       groupGapBoundary: false,
+      unionId: parentUnion.id,
     });
     descRoot.children.push(fb);
   } else if (parentUnion) {
@@ -527,6 +535,7 @@ export function computeLayout(data: TreeData, opts: LayoutOptions): LayoutResult
           coupleDrop: false,
           childIdx: [ancRoot.children.length],
           groupGapBoundary: false,
+          dashed: childRelOf(pu, slot.personId) !== 'birth',
         });
         ancRoot.children.push(gb);
       } else {
@@ -627,21 +636,40 @@ export function computeLayout(data: TreeData, opts: LayoutOptions): LayoutResult
     );
     const upGroups = b.groups.filter((g) => g.childIdx.some((i) => b.children[i].gen < b.gen));
 
-    // descendant buses: marriage point here -> lane -> child anchors below
+    // descendant buses: marriage point here -> lane -> child anchors below.
+    // Stubs of adopted/step/foster children split into separate dashed paths.
     downGroups.forEach((g, gi) => {
       const mx = b.cx + g.marriageDX;
       const startY = g.coupleDrop ? rowCenter(b.gen) : rowBottom(b.gen);
       const lane =
         rowBottom(b.gen) + GEN_GAP / 2 + (gi - (downGroups.length - 1) / 2) * LANE_STEP;
+      const union = g.unionId ? data.unions[g.unionId] : undefined;
       const lowers = g.childIdx.map((i) => {
         const c = b.children[i];
-        return { x: c.cx + c.anchorDX, topY: rowTop(c.gen) };
+        return {
+          x: c.cx + c.anchorDX,
+          topY: rowTop(c.gen),
+          dashed: union && c.anchorPersonId ? childRelOf(union, c.anchorPersonId) !== 'birth' : false,
+        };
       });
-      links.push({
-        key: `bus-${keyCounter++}`,
-        d: emitDropBus(mx, startY, lane, lowers),
-        kind: 'tree',
-      });
+      const solid = lowers.filter((l) => !l.dashed);
+      const dashed = lowers.filter((l) => l.dashed);
+      // drop + bus (spanning ALL children) + solid stubs in one path
+      let d = `M ${mx} ${startY} L ${mx} ${lane}`;
+      const xs = [mx, ...lowers.map((l) => l.x)];
+      const busL = Math.min(...xs);
+      const busR = Math.max(...xs);
+      if (busR - busL > 0.5) d += ` M ${busL} ${lane} L ${busR} ${lane}`;
+      for (const l of solid) d += ` M ${l.x} ${lane} L ${l.x} ${l.topY}`;
+      links.push({ key: `bus-${keyCounter++}`, d, kind: 'tree' });
+      for (const l of dashed) {
+        links.push({
+          key: `bus-${keyCounter++}`,
+          d: `M ${l.x} ${lane} L ${l.x} ${l.topY}`,
+          kind: 'tree',
+          dashed: true,
+        });
+      }
     });
 
     // ancestor buses: the layout-child is the PARENT couple drawn above;
@@ -657,6 +685,7 @@ export function computeLayout(data: TreeData, opts: LayoutOptions): LayoutResult
         key: `abus-${keyCounter++}`,
         d: emitDropBus(mx, startY, lane, [{ x: b.cx + g.marriageDX, topY: rowTop(b.gen) }]),
         kind: 'tree',
+        dashed: g.dashed,
       });
     });
 

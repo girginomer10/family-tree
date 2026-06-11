@@ -1,7 +1,7 @@
 {
-  "name": "family_tree",
+  "name": "family-tree",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,5 +28,13 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"
-  }
+  },
+  "description": "Client-side family tree app with a custom SVG layout engine — hourglass, pedigree, fan chart & timeline views, kinship calculator, GEDCOM import/export.",
+  "license": "MIT",
+  "author": "Ömer Girgin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/girginomer10/family-tree.git"
+  },
+  "homepage": "https://girginomer10.github.io/family-tree/"
 }

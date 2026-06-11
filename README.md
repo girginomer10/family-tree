@@ -1,50 +1,63 @@
-# Family Tree
+<div align="center">
 
-A from-scratch, fully client-side family tree application. React + TypeScript + Vite, with a
-custom SVG layout engine — no chart library.
+# 🌳 Family Tree
 
-```bash
-npm install
-npm run dev        # start the app
-npm run build      # type-check + production build
-npx tsx scripts/smoke.ts   # logic smoke tests (model, layout, GEDCOM round-trip)
-```
+**A fully client-side family tree application with a hand-built SVG layout engine.**
+No chart library, no backend — your data never leaves the browser.
+
+[![CI](https://github.com/girginomer10/family-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/girginomer10/family-tree/actions/workflows/ci.yml)
+[![Deploy](https://github.com/girginomer10/family-tree/actions/workflows/deploy.yml/badge.svg)](https://github.com/girginomer10/family-tree/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-burlywood.svg)](LICENSE)
+![React](https://img.shields.io/badge/React-19-58c4dc?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)
+
+**[▶ Live demo](https://girginomer10.github.io/family-tree/)** — loads a 22-person sample family
+
+<img src="docs/screenshots/hourglass.png" alt="Hourglass view" width="900" />
+
+</div>
 
 ## Features
 
-- **Five chart views** (toolbar switcher): **Hourglass** (ancestors + descendants +
-  siblings), **Pedigree** (blood ancestors only), **Descendants**, a **Fan chart**
-  (240° ancestor fan, branch-colored, with "+" sectors to add unknown ancestors in
-  place), and a **Timeline** (lifespan bars over a decade grid with marriage markers).
-- **Hourglass chart** centered on a focus person: ancestors above (pedigree), descendants
-  below, the focus's siblings and half-siblings on the focus row. Click a card to select,
-  double-click (or use the side panel) to re-center the tree on that person.
-- **Relationship calculator** (⇄): proper kinship terms — "half-brother",
-  "great-grandmother", "first cousin once removed", in-law composition ("husband of
-  sister") — plus a clickable link chain for distant connections. The side panel shows
-  every selected person's relation to the focus automatically.
-- **Statistics dashboard** (◫): totals, living/deceased, average lifespan, longest life,
-  births-per-decade histogram, top surnames/given names/birth places.
-- **Multiple trees**: the ▾ menu next to the tree name switches, creates, and deletes
-  independent trees; file imports land in a new tree instead of overwriting.
-- **Adoption/step/foster children**: per-union child relationship types (cycle the ☉/◌
-  toggle on a child row); non-birth links draw as dashed connectors and round-trip
-  through GEDCOM as `PEDI`.
-- **Couples drawn side by side**; children hang off the *union* (marriage), not an
-  individual. Multiple marriages, half-siblings, and unknown parents all render correctly;
-  divorced/separated unions get a dashed spouse line.
-- **Badges** (`▲`/`▼`) on cards mark relatives that exist but are outside the rendered
-  scope (hidden ancestors, other families, aunts/uncles); clicking a badge re-centers.
-- **Editing**: add parent / spouse (new or link an existing person) / child (choosing the
-  other parent) / sibling; edit person facts (fuzzy dates with `abt./bef./aft.`, places,
-  occupation, notes, deceased); photo upload (auto-downscaled to a portable data URL) or
-  photo URL; edit relationship status & marriage info; unlink partners/children; reorder
-  siblings; delete people. All edits are undoable (⌘Z / ⇧⌘Z).
-- **Search** (`/` to jump to the box), generation depth selectors (↑ ancestors, ↓
-  descendants, 1–5 or All), pan/zoom canvas with fit-to-screen.
-- **Persistence**: autosaves to `localStorage`. **Import/Export**: JSON (full fidelity),
-  GEDCOM 5.5.1 (interops with Gramps/webtrees/Ancestry/etc.), and the chart as SVG or PNG.
-- Ships with a 22-person, 4-generation sample family covering the tricky cases.
+- **Five chart views**: Hourglass (ancestors + descendants + siblings), Pedigree (blood
+  line only), Descendants, a branch-colored **Fan chart** with in-place "+ add ancestor"
+  sectors, and a **Timeline** of lifespan bars with marriage markers.
+- **Real genealogy semantics**: the data model is *Person + Union* (GEDCOM INDI/FAM
+  style), so multiple marriages, half-siblings, unknown parents, divorced couples
+  (dashed line) and adopted/step/foster children (dashed stubs, GEDCOM `PEDI`) all
+  work correctly — no special-case hacks.
+- **Relationship calculator**: proper kinship terms ("half-brother", "first cousin once
+  removed", "husband of sister"), plus a clickable connection chain for distant pairs.
+  The side panel always shows how the selected person relates to the focus person.
+- **Full editing**: add parent / spouse / child / sibling (or link existing people),
+  fuzzy dates (`abt. 1890`), photo upload (auto-downscaled to portable data URLs),
+  marriage details, sibling reordering, unlink/delete — all with undo/redo (⌘Z).
+- **Statistics dashboard**: lifespans, births per decade, top surnames & birth places.
+- **Multiple trees** with instant switching; imports always land in a new tree.
+- **Import/Export**: GEDCOM 5.5.1 (round-trip tested, interops with Gramps, webtrees,
+  Ancestry…), JSON, and the chart itself as SVG or PNG.
+- **Navigation**: pan/zoom canvas, click to select, double-click to re-center,
+  `/` for search, ▲/▼ badges reveal relatives outside the rendered depth.
+
+## Gallery
+
+| Fan chart | Timeline |
+| :---: | :---: |
+| ![Fan chart](docs/screenshots/fan.png) | ![Timeline](docs/screenshots/timeline.png) |
+
+| Pedigree | Hourglass |
+| :---: | :---: |
+| ![Pedigree](docs/screenshots/pedigree.png) | ![Hourglass](docs/screenshots/hourglass.png) |
+
+## Quick start
+
+```bash
+npm install
+npm run dev        # start the app at http://localhost:5173
+npm run build      # type-check + production build
+npm run smoke      # ~160 logic checks: model, layouts, kinship, GEDCOM round-trip
+```
 
 ## Architecture
 
@@ -77,12 +90,13 @@ remarriage, half-siblings, and unknown parents:
 
 - `Person` — names, gender, fuzzy birth/death events, plus back-references
   `unionsAsPartner[]` (~FAMS) and `unionAsChild` (~FAMC).
-- `Union` — up to 2 `partners`, ordered `children`, status (married/divorced/…),
-  marriage/divorce events. A union with one partner = the other parent is unknown.
+- `Union` — up to 2 `partners`, ordered `children` (with per-child birth/adopted/step/
+  foster types), status, marriage/divorce events. A union with one partner = the other
+  parent is unknown.
 
 `validate()` checks referential integrity; every mutation and import maintains it.
 
-### Layout engine (src/layout/layout.ts)
+### Layout engine (`src/layout/layout.ts`)
 
 A tidy-tree variant over "blocks" (anchor person + spouse cards laid side by side):
 
@@ -107,16 +121,18 @@ and renderer-agnostic.
 Import parses the line/level structure into a node tree, folds `CONC/CONT`, builds
 persons from `INDI` and unions from `FAM`, then rebuilds all person-side pointers from
 the FAM records (authoritative), collecting warnings instead of throwing. Export writes
-GEDCOM 5.5.1 with `CHAR UTF-8`, sequential `@I#@/@F#@` xrefs, and HUSB/WIFE slots
-assigned by gender. Round-trip is covered in `scripts/smoke.ts`.
+GEDCOM 5.5.1 with `CHAR UTF-8`, sequential `@I#@/@F#@` xrefs, HUSB/WIFE slots assigned
+by gender, and `PEDI` for non-birth children. Round-trip is covered in `scripts/smoke.ts`.
 
-## Notes for future work
+## Notes & roadmap
 
-- Aunts/uncles/cousins are intentionally out of hourglass scope (badges + refocus reach
-  them). A "descendants of ancestors" toggle would widen the view.
-- Possible next features: map of life events, fan-chart data-completeness overlay,
-  PDF export, drag-to-reorder siblings, merge/duplicate-person detection across imports.
-- `newId()` is timestamp+random based; collisions across import/merge are not handled
-  (GEDCOM import keeps file xrefs, JSON import keeps stored ids).
+- Aunts/uncles/cousins are intentionally outside hourglass scope — badges + refocus
+  reach them. A "descendants of ancestors" toggle would widen the view.
+- Ideas: map of life events, fan-chart data-completeness overlay, PDF export,
+  drag-to-reorder siblings, duplicate-person detection across imports.
 - PNG export rasterizes the live SVG; photos from remote URLs taint the canvas and make
   it fail (uploaded data-URL photos are safe) — the app shows a hint when that happens.
+
+## License
+
+[MIT](LICENSE) © 2026 Ömer Girgin

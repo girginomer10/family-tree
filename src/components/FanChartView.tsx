@@ -2,6 +2,9 @@ import { forwardRef, useMemo } from 'react';
 import type { TreeData } from '../types';
 import { fullName, lifespan } from '../types';
 import { computeFan } from '../layout/fan';
+import type { HealthMark } from '../model/health';
+import { HEALTH_COLORS, HEALTH_DIM_OPACITY } from '../model/health';
+import { HealthLegend } from './HealthLegend';
 import { ZoomCanvas, type ZoomCanvasHandle } from './ZoomCanvas';
 
 interface Props {
@@ -13,10 +16,23 @@ interface Props {
   onFocus: (id: string) => void;
   onAddParent: (childId: string) => void;
   onBackgroundClick: () => void;
+  healthMarks?: Map<string, HealthMark> | null;
+  healthLabel?: string | null;
 }
 
 export const FanChartView = forwardRef<ZoomCanvasHandle, Props>(function FanChartView(
-  { data, focusId, rings, selectedId, onSelect, onFocus, onAddParent, onBackgroundClick },
+  {
+    data,
+    focusId,
+    rings,
+    selectedId,
+    onSelect,
+    onFocus,
+    onAddParent,
+    onBackgroundClick,
+    healthMarks,
+    healthLabel,
+  },
   ref,
 ) {
   const fan = useMemo(() => computeFan(data, focusId, rings), [data, focusId, rings]);
@@ -29,15 +45,22 @@ export const FanChartView = forwardRef<ZoomCanvasHandle, Props>(function FanChar
       bounds={fan.bounds}
       onBackgroundClick={onBackgroundClick}
       overlay={
-        <div className="canvas-stats">
-          Fan chart — {fan.shownPersons} of {total} people · {rings} generations of ancestors
-        </div>
+        <>
+          <div className="canvas-stats">
+            Fan chart — {fan.shownPersons} of {total} people · {rings} generations of ancestors
+          </div>
+          {healthMarks && <HealthLegend label={healthLabel} marks={healthMarks} />}
+        </>
       }
     >
-      {fan.sectors.map((s) => (
+      {fan.sectors.map((s) => {
+        const mark = s.personId ? healthMarks?.get(s.personId) ?? null : null;
+        const dimmed = !!healthMarks && !!s.personId && !mark;
+        return (
         <g
           key={s.key}
           style={{ cursor: 'pointer' }}
+          opacity={dimmed ? HEALTH_DIM_OPACITY : 1}
           onClick={(e) => {
             e.stopPropagation();
             if (s.personId) onSelect(s.personId);
@@ -59,10 +82,20 @@ export const FanChartView = forwardRef<ZoomCanvasHandle, Props>(function FanChar
           </title>
           <path
             d={s.d}
-            fill={s.fill}
-            stroke={s.personId && selectedId === s.personId ? '#5b54a0' : s.stroke}
-            strokeWidth={s.personId && selectedId === s.personId ? 2.5 : 1}
-            strokeDasharray={s.personId ? undefined : '5 4'}
+            fill={mark ? HEALTH_COLORS[mark].fill : s.fill}
+            stroke={
+              s.personId && selectedId === s.personId
+                ? '#5b54a0'
+                : mark
+                  ? HEALTH_COLORS[mark].stroke
+                  : s.stroke
+            }
+            strokeWidth={
+              s.personId && selectedId === s.personId ? 2.5 : mark === 'has' ? 2 : 1
+            }
+            strokeDasharray={
+              s.personId ? (mark === 'risk' ? '5 4' : undefined) : '5 4'
+            }
           />
           {s.label && (
             <text
@@ -84,12 +117,14 @@ export const FanChartView = forwardRef<ZoomCanvasHandle, Props>(function FanChar
             </text>
           )}
         </g>
-      ))}
+        );
+      })}
 
       {/* center disc: the focus person */}
       {focus && (
         <g
           style={{ cursor: 'pointer' }}
+          opacity={healthMarks && !healthMarks.get(focus.id) ? HEALTH_DIM_OPACITY : 1}
           onClick={(e) => {
             e.stopPropagation();
             onSelect(focus.id);
@@ -98,7 +133,11 @@ export const FanChartView = forwardRef<ZoomCanvasHandle, Props>(function FanChar
           <circle
             r={fan.centerR - 4}
             fill={selectedId === focus.id ? '#fbfaff' : '#ffffff'}
-            stroke="#5b54a0"
+            stroke={
+              healthMarks?.get(focus.id)
+                ? HEALTH_COLORS[healthMarks.get(focus.id)!].stroke
+                : '#5b54a0'
+            }
             strokeWidth={selectedId === focus.id ? 3 : 2}
           />
           <text textAnchor="middle" fill="#2a2722">

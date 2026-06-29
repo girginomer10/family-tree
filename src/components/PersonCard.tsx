@@ -2,6 +2,8 @@ import type { Person } from '../types';
 import { fullName, hasHereditaryCondition, lifespan } from '../types';
 import type { PlacedCard } from '../layout/layout';
 import { CARD_H, CARD_W } from '../layout/layout';
+import type { HealthMark } from '../model/health';
+import { HEALTH_COLORS, HEALTH_DIM_OPACITY } from '../model/health';
 
 const COLORS = {
   M: { stroke: '#4d7fae', fill: '#e3eef7', text: '#2f5a82' },
@@ -26,15 +28,28 @@ interface Props {
   isSelected: boolean;
   onSelect: (id: string) => void;
   onFocus: (id: string) => void;
+  /** Hereditary-overlay classification for this person (null = no overlay). */
+  healthMark?: HealthMark | null;
+  /** True when a hereditary overlay is active (dims non-matching cards). */
+  healthActive?: boolean;
 }
 
-export function PersonCard({ placed, person, isSelected, onSelect, onFocus }: Props) {
+export function PersonCard({
+  placed,
+  person,
+  isSelected,
+  onSelect,
+  onFocus,
+  healthMark = null,
+  healthActive = false,
+}: Props) {
   const c = COLORS[person.gender];
   const { x, y } = placed;
   const cx = CARD_W / 2;
   const focus = placed.isFocus;
   const stub = placed.isStub;
   const dead = !!person.isDeceased || !!person.death;
+  const dimmed = healthActive && !healthMark;
   const hereditary = hasHereditaryCondition(person);
   const hereditaryNames = hereditary
     ? person.conditions!.filter((c) => c.hereditary).map((c) => c.name).join(', ')
@@ -48,6 +63,7 @@ export function PersonCard({ placed, person, isSelected, onSelect, onFocus }: Pr
     <g
       transform={`translate(${x}, ${y})`}
       style={{ cursor: 'pointer' }}
+      opacity={dimmed ? HEALTH_DIM_OPACITY : 1}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(person.id);
@@ -86,6 +102,22 @@ export function PersonCard({ placed, person, isSelected, onSelect, onFocus }: Pr
         strokeDasharray={stub ? '5 4' : undefined}
         opacity={stub ? 0.8 : 1}
       />
+
+      {/* hereditary overlay ring */}
+      {healthMark && (
+        <rect
+          x={-4}
+          y={-4}
+          width={CARD_W + 8}
+          height={CARD_H + 8}
+          rx={16}
+          fill="none"
+          stroke={HEALTH_COLORS[healthMark].stroke}
+          strokeWidth={healthMark === 'has' ? 3 : 2.5}
+          strokeOpacity={healthMark === 'has' ? 0.95 : 0.7}
+          strokeDasharray={healthMark === 'risk' ? '6 5' : undefined}
+        />
+      )}
 
       {/* avatar */}
       {person.photoUrl ? (
@@ -130,6 +162,20 @@ export function PersonCard({ placed, person, isSelected, onSelect, onFocus }: Pr
           <circle cx={cx - 19} cy={24} r={7} fill="#2f8f83" stroke="#fff" strokeWidth={1} />
           <rect x={cx - 20} y={20.5} width={2} height={7} rx={1} fill="#fff" />
           <rect x={cx - 22.5} y={23} width={7} height={2} rx={1} fill="#fff" />
+        </g>
+      )}
+      {healthMark === 'risk' && (
+        <g>
+          <title>At-risk — blood descendant of a carrier</title>
+          <circle
+            cx={cx - 19}
+            cy={24}
+            r={6.5}
+            fill="#fff"
+            stroke={HEALTH_COLORS.risk.stroke}
+            strokeWidth={1.75}
+            strokeDasharray="2.5 2"
+          />
         </g>
       )}
 

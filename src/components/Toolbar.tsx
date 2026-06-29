@@ -16,6 +16,9 @@ interface Props {
   descendantDepth: number;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  health: string | null;
+  healthOptions: { name: string; count: number }[];
+  onHealthChange: (name: string | null) => void;
   onUndo: () => void;
   onRedo: () => void;
   onRenameTree: (name: string) => void;
@@ -216,6 +219,26 @@ export function Toolbar(props: Props) {
               {DEPTHS.map((d) => (
                 <option key={d} value={d}>
                   {depthLabel(d)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {props.healthOptions.length > 0 && (
+          <label
+            className={`health-select${props.health ? ' active' : ''}`}
+            title="Highlight a hereditary condition: carriers and at-risk blood descendants"
+          >
+            ⚕
+            <select
+              value={props.health ?? ''}
+              onChange={(e) => props.onHealthChange(e.target.value || null)}
+            >
+              <option value="">Health: off</option>
+              {props.healthOptions.map((o) => (
+                <option key={o.name} value={o.name}>
+                  {o.name} ({o.count})
                 </option>
               ))}
             </select>

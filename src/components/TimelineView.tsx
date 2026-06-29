@@ -1,6 +1,9 @@
 import { forwardRef, useMemo } from 'react';
 import type { TreeData } from '../types';
 import { computeTimeline, BAR_H, ROW_H } from '../layout/timeline';
+import type { HealthMark } from '../model/health';
+import { HEALTH_COLORS, HEALTH_DIM_OPACITY } from '../model/health';
+import { HealthLegend } from './HealthLegend';
 import { ZoomCanvas, type ZoomCanvasHandle } from './ZoomCanvas';
 
 const BAR_COLORS = {
@@ -15,10 +18,12 @@ interface Props {
   onSelect: (id: string) => void;
   onFocus: (id: string) => void;
   onBackgroundClick: () => void;
+  healthMarks?: Map<string, HealthMark> | null;
+  healthLabel?: string | null;
 }
 
 export const TimelineView = forwardRef<ZoomCanvasHandle, Props>(function TimelineView(
-  { data, selectedId, onSelect, onFocus, onBackgroundClick },
+  { data, selectedId, onSelect, onFocus, onBackgroundClick, healthMarks, healthLabel },
   ref,
 ) {
   const currentYear = new Date().getFullYear();
@@ -31,10 +36,13 @@ export const TimelineView = forwardRef<ZoomCanvasHandle, Props>(function Timelin
       bounds={tl.bounds}
       onBackgroundClick={onBackgroundClick}
       overlay={
-        <div className="canvas-stats">
-          Timeline — {tl.shownPersons} people with dates
-          {tl.omittedPersons > 0 ? ` (${tl.omittedPersons} without dates omitted)` : ''}
-        </div>
+        <>
+          <div className="canvas-stats">
+            Timeline — {tl.shownPersons} people with dates
+            {tl.omittedPersons > 0 ? ` (${tl.omittedPersons} without dates omitted)` : ''}
+          </div>
+          {healthMarks && <HealthLegend label={healthLabel} marks={healthMarks} />}
+        </>
       }
     >
       {/* decade grid */}
@@ -54,10 +62,13 @@ export const TimelineView = forwardRef<ZoomCanvasHandle, Props>(function Timelin
         const isSel = selectedId === r.personId;
         const isFocus = data.focusId === r.personId;
         const barY = r.y + (ROW_H - BAR_H) / 2;
+        const mark = healthMarks?.get(r.personId) ?? null;
+        const dimmed = !!healthMarks && !mark;
         return (
           <g
             key={r.personId}
             style={{ cursor: 'pointer' }}
+            opacity={dimmed ? HEALTH_DIM_OPACITY : 1}
             onClick={(e) => {
               e.stopPropagation();
               onSelect(r.personId);
@@ -88,10 +99,12 @@ export const TimelineView = forwardRef<ZoomCanvasHandle, Props>(function Timelin
               width={Math.max(r.x2 - r.x1, 4)}
               height={BAR_H}
               rx={5}
-              fill={c.fill}
-              stroke={isSel || isFocus ? '#5b54a0' : c.stroke}
-              strokeWidth={isSel || isFocus ? 2 : 1}
-              strokeDasharray={r.approxStart ? '4 3' : undefined}
+              fill={mark ? HEALTH_COLORS[mark].fill : c.fill}
+              stroke={
+                isSel || isFocus ? '#5b54a0' : mark ? HEALTH_COLORS[mark].stroke : c.stroke
+              }
+              strokeWidth={isSel || isFocus || mark === 'has' ? 2 : 1}
+              strokeDasharray={mark === 'risk' ? '5 4' : r.approxStart ? '4 3' : undefined}
               opacity={r.living ? 0.75 : 1}
             />
             {r.living && (

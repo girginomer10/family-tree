@@ -1,7 +1,9 @@
 import { forwardRef } from 'react';
 import type { TreeData } from '../types';
 import type { LayoutResult } from '../layout/layout';
+import type { HealthMark } from '../model/health';
 import { GhostCard, PersonCard } from './PersonCard';
+import { HealthLegend } from './HealthLegend';
 import { ZoomCanvas, type ZoomCanvasHandle } from './ZoomCanvas';
 
 export type TreeCanvasHandle = ZoomCanvasHandle;
@@ -14,10 +16,12 @@ interface Props {
   onFocus: (id: string) => void;
   onAddParents: () => void;
   onBackgroundClick: () => void;
+  healthMarks?: Map<string, HealthMark> | null;
+  healthLabel?: string | null;
 }
 
 export const TreeCanvas = forwardRef<TreeCanvasHandle, Props>(function TreeCanvas(
-  { data, layout, selectedId, onSelect, onFocus, onAddParents, onBackgroundClick },
+  { data, layout, selectedId, onSelect, onFocus, onAddParents, onBackgroundClick, healthMarks, healthLabel },
   ref,
 ) {
   const total = Object.keys(data.persons).length;
@@ -27,10 +31,13 @@ export const TreeCanvas = forwardRef<TreeCanvasHandle, Props>(function TreeCanva
       bounds={layout.bounds}
       onBackgroundClick={onBackgroundClick}
       overlay={
-        <div className="canvas-stats">
-          {layout.shownPersons} of {total} people shown
-          {layout.shownPersons < total ? ' — use search or badges to navigate' : ''}
-        </div>
+        <>
+          <div className="canvas-stats">
+            {layout.shownPersons} of {total} people shown
+            {layout.shownPersons < total ? ' — use search or badges to navigate' : ''}
+          </div>
+          {healthMarks && <HealthLegend label={healthLabel} marks={healthMarks} />}
+        </>
       }
     >
       {layout.links.map((l) => (
@@ -55,6 +62,8 @@ export const TreeCanvas = forwardRef<TreeCanvasHandle, Props>(function TreeCanva
             isSelected={selectedId === c.personId}
             onSelect={onSelect}
             onFocus={onFocus}
+            healthMark={healthMarks?.get(c.personId) ?? null}
+            healthActive={!!healthMarks}
           />
         ),
       )}

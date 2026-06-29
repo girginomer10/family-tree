@@ -37,6 +37,10 @@ No chart library, no backend — your data never leaves the browser.
   resolved / cause of death), age at onset and notes. **Hereditary** conditions are
   flagged with a ⚕ badge right on the tree card so heritable traits are visible at a
   glance, and they round-trip through GEDCOM (custom `_MDCL` tag).
+- **Hereditary overlay**: pick a heritable condition from the toolbar and every chart
+  view (hourglass, pedigree, descendants, fan, timeline) highlights **carriers** and
+  the **blood descendants at risk** of inheriting it — risk follows birth lines only,
+  so adopted/step/foster branches are correctly excluded.
 - **Statistics dashboard**: lifespans, births per decade, top surnames, birth places &
   most common conditions (with hereditary-carrier count).
 - **Multiple trees** with instant switching; imports always land in a new tree.

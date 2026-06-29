@@ -5,6 +5,7 @@ import { useTreeStore } from './store/useTreeStore';
 import { computeLayout } from './layout/layout';
 import * as M from './model/mutations';
 import { getUnionsOf, validate } from './model/queries';
+import { computeHealthOverlay, hereditaryConditionNames } from './model/health';
 import { sampleTree } from './data/sample';
 import { exportGedcom, importGedcom } from './gedcom/gedcom';
 import { downloadBlob, downloadText, exportSvg, readFileAsText, svgToPng } from './utils/files';
@@ -34,6 +35,8 @@ interface ViewSettings {
   anc: number;
   desc: number;
   mode: ViewMode;
+  /** Hereditary condition name highlighted across the chart (null = off). */
+  health?: string | null;
 }
 
 const DEPTH_KEY = 'family-tree-depths-v1';
@@ -66,6 +69,17 @@ export default function App() {
     [data, view],
   );
   const fanRings = Math.max(1, Math.min(view.anc, 6));
+
+  // ----- hereditary overlay -----
+  const hereditaryNames = useMemo(() => hereditaryConditionNames(data), [data]);
+  // ignore a stored condition that isn't in the current tree (e.g. after a tree switch)
+  const healthName =
+    view.health && hereditaryNames.some((h) => h.name === view.health) ? view.health : null;
+  const healthOverlay = useMemo(
+    () => (healthName ? computeHealthOverlay(data, healthName) : null),
+    [data, healthName],
+  );
+  const healthMarks = healthOverlay?.marks ?? null;
 
   // keep selection valid
   const selected = selectedId ? data.persons[selectedId] : undefined;
@@ -223,6 +237,9 @@ export default function App() {
         descendantDepth={view.desc}
         viewMode={view.mode}
         onViewModeChange={(mode) => setView((v) => ({ ...v, mode }))}
+        health={healthName}
+        healthOptions={hereditaryNames}
+        onHealthChange={(name) => setView((v) => ({ ...v, health: name }))}
         onUndo={store.undo}
         onRedo={store.redo}
         onRenameTree={(name) => store.applyTransient(M.renameTree(data, name))}
@@ -294,6 +311,8 @@ export default function App() {
             onSelect={setSelectedId}
             onFocus={centerOn}
             onBackgroundClick={() => setSelectedId(null)}
+            healthMarks={healthMarks}
+            healthLabel={healthName}
           />
         ) : view.mode === 'fan' && data.focusId ? (
           <FanChartView
@@ -306,6 +325,8 @@ export default function App() {
             onFocus={centerOn}
             onAddParent={(childId) => setModal({ kind: 'add-parent', personId: childId })}
             onBackgroundClick={() => setSelectedId(null)}
+            healthMarks={healthMarks}
+            healthLabel={healthName}
           />
         ) : (
           <TreeCanvas
@@ -319,6 +340,8 @@ export default function App() {
               if (data.focusId) setModal({ kind: 'add-parent', personId: data.focusId });
             }}
             onBackgroundClick={() => setSelectedId(null)}
+            healthMarks={healthMarks}
+            healthLabel={healthName}
           />
         )}
 

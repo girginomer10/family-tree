@@ -9,7 +9,9 @@ import type {
 } from '../types';
 import { CONDITION_STATUS_LABEL, fullName, lifespan } from '../types';
 import type { PersonDraft } from '../model/mutations';
+import type { ConditionNameInfo } from '../model/health';
 import { searchPersons } from '../model/queries';
+import { PRESET_CONDITIONS } from '../data/conditions';
 import { fileToDataUrl } from '../utils/files';
 
 // ---------------------------------------------------------------------------
@@ -109,28 +111,64 @@ const CONDITION_STATUSES: ConditionStatus[] = [
   'cause-of-death',
 ];
 
+type Suggestion = { name: string; count?: number; hereditary?: boolean };
+
 function ConditionsEditor({
   value,
   onChange,
+  existingNames = [],
 }: {
   value: HealthCondition[];
   onChange: (v: HealthCondition[]) => void;
+  existingNames?: ConditionNameInfo[];
 }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  // Names already in the tree (most common first) followed by presets not yet used.
+  const suggestions = useMemo<Suggestion[]>(() => {
+    const seen = new Set(existingNames.map((n) => n.name.toLowerCase()));
+    const presets: Suggestion[] = PRESET_CONDITIONS.filter(
+      (p) => !seen.has(p.toLowerCase()),
+    ).map((name) => ({ name }));
+    return [...existingNames, ...presets];
+  }, [existingNames]);
+
+  const matchesFor = (name: string): Suggestion[] => {
+    const q = name.trim().toLowerCase();
+    return suggestions
+      .filter((s) => s.name.toLowerCase() !== q) // nothing to complete if already exact
+      .filter((s) => !q || s.name.toLowerCase().includes(q))
+      .slice(0, 8);
+  };
+
   const update = (i: number, patch: Partial<HealthCondition>) =>
     onChange(value.map((c, j) => (j === i ? { ...c, ...patch } : c)));
-  const remove = (i: number) => onChange(value.filter((_, j) => j !== i));
+  const remove = (i: number) => {
+    setOpenIndex(null);
+    onChange(value.filter((_, j) => j !== i));
+  };
   const add = () => onChange([...value, { name: '' }]);
 
   return (
     <div className="conditions-editor">
-      {value.map((c, i) => (
+      {value.map((c, i) => {
+        const matches = openIndex === i ? matchesFor(c.name) : [];
+        return (
         <div key={i} className="condition-edit">
           <div className="condition-edit-main">
             <input
               type="text"
               placeholder="Condition / illness"
               value={c.name}
-              onChange={(e) => update(i, { name: e.target.value })}
+              autoComplete="off"
+              onChange={(e) => {
+                update(i, { name: e.target.value });
+                setOpenIndex(i);
+              }}
+              onFocus={() => setOpenIndex(i)}
+              onBlur={() =>
+                setTimeout(() => setOpenIndex((cur) => (cur === i ? null : cur)), 150)
+              }
             />
             <select
               value={c.status ?? ''}
@@ -157,6 +195,34 @@ function ConditionsEditor({
               ✕
             </button>
           </div>
+          {matches.length > 0 && (
+            <ul className="condition-suggest">
+              {matches.map((s) => (
+                <li key={s.name}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      update(i, { name: s.name });
+                      setOpenIndex(null);
+                    }}
+                  >
+                    <span className="cs-name">{s.name}</span>
+                    {s.hereditary && (
+                      <span className="cs-her" title="Recorded as hereditary elsewhere">
+                        ⚕
+                      </span>
+                    )}
+                    {s.count != null ? (
+                      <span className="cs-count">in tree · {s.count}</span>
+                    ) : (
+                      <span className="cs-preset">suggested</span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="condition-edit-meta">
             <label className={c.hereditary ? 'chip active' : 'chip'} title="Heritable condition">
               <input
@@ -188,7 +254,8 @@ function ConditionsEditor({
             />
           </div>
         </div>
-      ))}
+        );
+      })}
       <button type="button" className="btn small ghost" onClick={add}>
         + Add condition
       </button>
@@ -220,6 +287,8 @@ interface Props {
   unionOptions?: UnionOption[];
   /** When set, the form offers an "existing person" picker (for spouse links). */
   allowExisting?: { data: TreeData; excludeIds: string[] };
+  /** Condition names already used in the tree, for the health autocomplete. */
+  conditionNames?: ConditionNameInfo[];
   onSubmit: (result: PersonFormResult) => void;
   onLinkExisting?: (personId: string) => void;
   onCancel: () => void;
@@ -233,6 +302,7 @@ export function PersonFormModal({
   defaultSurname,
   unionOptions,
   allowExisting,
+  conditionNames,
   onSubmit,
   onLinkExisting,
   onCancel,
@@ -513,7 +583,11 @@ export function PersonFormModal({
 
             <div className="form-section">
               <span className="form-section-label">⚕ Health conditions</span>
-              <ConditionsEditor value={conditions} onChange={setConditions} />
+              <ConditionsEditor
+                value={conditions}
+                onChange={setConditions}
+                existingNames={conditionNames}
+              />
             </div>
 
             <div className="modal-actions">

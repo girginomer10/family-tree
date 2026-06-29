@@ -5,7 +5,7 @@ import { useTreeStore } from './store/useTreeStore';
 import { computeLayout } from './layout/layout';
 import * as M from './model/mutations';
 import { getUnionsOf, validate } from './model/queries';
-import { computeHealthOverlay, hereditaryConditionNames } from './model/health';
+import { allConditionNames, computeHealthOverlay, hereditaryConditionNames } from './model/health';
 import { sampleTree } from './data/sample';
 import { exportGedcom, importGedcom } from './gedcom/gedcom';
 import { downloadBlob, downloadText, exportSvg, readFileAsText, svgToPng } from './utils/files';
@@ -80,6 +80,8 @@ export default function App() {
     [data, healthName],
   );
   const healthMarks = healthOverlay?.marks ?? null;
+  // condition names already in the tree → health autocomplete suggestions
+  const conditionNames = useMemo(() => allConditionNames(data), [data]);
 
   // keep selection valid
   const selected = selectedId ? data.persons[selectedId] : undefined;
@@ -381,6 +383,7 @@ export default function App() {
         <PersonFormModal
           title="Add first person"
           submitLabel="Add"
+          conditionNames={conditionNames}
           onSubmit={({ draft }) => applyAndSelect(M.addUnconnectedPerson(data, draft))}
           onCancel={() => setModal({ kind: 'none' })}
         />
@@ -391,6 +394,7 @@ export default function App() {
           title={`Edit ${fullName(modalPerson)}`}
           submitLabel="Save"
           initial={modalPerson}
+          conditionNames={conditionNames}
           onSubmit={({ draft }) => {
             store.apply(M.updatePerson(data, modalPerson.id, draft));
             setModal({ kind: 'none' });
@@ -403,6 +407,7 @@ export default function App() {
         <PersonFormModal
           title={`Add spouse of ${fullName(modalPerson)}`}
           submitLabel="Add spouse"
+          conditionNames={conditionNames}
           defaultGender={
             modalPerson.gender === 'M' ? 'F' : modalPerson.gender === 'F' ? 'M' : 'U'
           }
@@ -427,6 +432,7 @@ export default function App() {
           title={`Add child of ${fullName(modalPerson)}`}
           submitLabel="Add child"
           defaultSurname={modalPerson.surname}
+          conditionNames={conditionNames}
           unionOptions={childUnionOptions}
           onSubmit={({ draft, unionChoice }) =>
             applyAndSelect(M.addChild(data, modalPerson.id, unionChoice ?? null, draft))
@@ -440,6 +446,7 @@ export default function App() {
           title={`Add parent of ${fullName(modalPerson)}`}
           submitLabel="Add parent"
           defaultSurname={modalPerson.surname}
+          conditionNames={conditionNames}
           onSubmit={({ draft }) => applyAndSelect(M.addParent(data, modalPerson.id, draft))}
           onCancel={() => setModal({ kind: 'none' })}
         />
@@ -450,6 +457,7 @@ export default function App() {
           title={`Add sibling of ${fullName(modalPerson)}`}
           submitLabel="Add sibling"
           defaultSurname={modalPerson.surname}
+          conditionNames={conditionNames}
           onSubmit={({ draft }) => applyAndSelect(M.addSibling(data, modalPerson.id, draft))}
           onCancel={() => setModal({ kind: 'none' })}
         />

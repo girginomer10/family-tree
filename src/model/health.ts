@@ -32,6 +32,31 @@ export function hereditaryConditionNames(data: TreeData): { name: string; count:
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
+export interface ConditionNameInfo {
+  name: string;
+  count: number;
+  /** True if the name is recorded as hereditary on at least one person. */
+  hereditary: boolean;
+}
+
+/** Every distinct condition name already used in the tree, most common first. */
+export function allConditionNames(data: TreeData): ConditionNameInfo[] {
+  const map = new Map<string, { count: number; hereditary: boolean }>();
+  for (const p of Object.values(data.persons)) {
+    for (const c of p.conditions ?? []) {
+      const name = c.name.trim();
+      if (!name) continue;
+      const e = map.get(name) ?? { count: 0, hereditary: false };
+      e.count++;
+      if (c.hereditary) e.hereditary = true;
+      map.set(name, e);
+    }
+  }
+  return [...map.entries()]
+    .map(([name, e]) => ({ name, ...e }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
 function personHasCondition(p: Person, name: string): boolean {
   return !!p.conditions?.some((c) => c.name === name);
 }

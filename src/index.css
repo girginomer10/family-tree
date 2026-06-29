@@ -1159,6 +1159,59 @@ button.rel-link:hover {
   flex: 1;
   min-width: 0;
 }
+.condition-suggest {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 22px rgba(40, 35, 20, 0.1);
+  max-height: 208px;
+  overflow: auto;
+}
+.condition-suggest li {
+  margin: 0;
+}
+.condition-suggest button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+}
+.condition-suggest button:hover {
+  background: var(--health-soft);
+}
+.condition-suggest .cs-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.condition-suggest .cs-her {
+  color: var(--health);
+  font-weight: 700;
+  flex: none;
+}
+.condition-suggest .cs-count,
+.condition-suggest .cs-preset {
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.condition-suggest .cs-preset {
+  font-style: italic;
+}
 .condition-edit-meta input[type='text'] {
   flex: 1;
   min-width: 0;

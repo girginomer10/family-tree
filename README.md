@@ -34,9 +34,11 @@ No chart library, no backend — your data never leaves the browser.
   fuzzy dates (`abt. 1890`), photo upload (auto-downscaled to portable data URLs),
   marriage details, sibling reordering, unlink/delete — all with undo/redo (⌘Z).
 - **Health conditions**: record illnesses per person with status (active / managed /
-  resolved / cause of death), age at onset and notes. **Hereditary** conditions are
-  flagged with a ⚕ badge right on the tree card so heritable traits are visible at a
-  glance, and they round-trip through GEDCOM (custom `_MDCL` tag).
+  resolved / cause of death), age at onset and notes. A name **autocomplete** suggests
+  names already in the tree (with usage counts) plus a curated preset list, keeping
+  spelling consistent so the stats and overlay aggregate cleanly. **Hereditary**
+  conditions are flagged with a ⚕ badge right on the tree card so heritable traits are
+  visible at a glance, and they round-trip through GEDCOM (custom `_MDCL` tag).
 - **Hereditary overlay**: pick a heritable condition from the toolbar and every chart
   view (hourglass, pedigree, descendants, fan, timeline) highlights **carriers** and
   the **blood descendants at risk** of inheriting it — risk follows birth lines only,

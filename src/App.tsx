@@ -239,6 +239,8 @@ export default function App() {
         descendantDepth={view.desc}
         viewMode={view.mode}
         onViewModeChange={(mode) => setView((v) => ({ ...v, mode }))}
+        backend={store.backend}
+        saving={store.saving}
         health={healthName}
         healthOptions={hereditaryNames}
         onHealthChange={(name) => setView((v) => ({ ...v, health: name }))}
@@ -282,6 +284,9 @@ export default function App() {
       />
 
       {banner && <div className="banner">{banner}</div>}
+      {store.backend === 'local' && store.dbError && (
+        <div className="banner warn">{store.dbError}</div>
+      )}
 
       <div className="main">
         {Object.keys(data.persons).length === 0 ? (

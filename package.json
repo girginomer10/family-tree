@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "node --experimental-sqlite server/index.js",
+    "start": "node --experimental-sqlite server/index.js & vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "db:roundtrip": "NODE_OPTIONS='--experimental-sqlite' tsx scripts/db-roundtrip.ts"
   },
   "dependencies": {
     "react": "^19.2.6",

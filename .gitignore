@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# local SQLite database (your data — stays on your disk)
+server/data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

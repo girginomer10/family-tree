@@ -3,13 +3,22 @@ import type { TreeData } from '../types';
 import { emptyTree, newId } from '../types';
 import { validate } from '../model/queries';
 import { sampleTree } from '../data/sample';
+import {
+  pingBackend,
+  listTrees as remoteList,
+  fetchTree as remoteGet,
+  createTree as remoteCreate,
+  putTree as remotePut,
+  deleteTreeRemote as remoteDelete,
+} from './backend';
 
 /**
- * Multi-tree persistence:
- *  - 'family-tree-index-v1' lists all trees and the current one.
- *  - Each tree lives under 'family-tree-data-v1:<id>'. The pre-multi-tree
- *    single tree key 'family-tree-data-v1' doubles as the storage of the
- *    'default' tree, so older data is picked up without migration.
+ * Persistence:
+ *  - The local SQLite backend (server/) is the source of truth when reachable.
+ *  - localStorage doubles as an offline cache and the "which tree is open" pref,
+ *    so the app renders instantly and still works if the server is down.
+ *  - On first connect to an empty DB, any existing localStorage trees are
+ *    migrated into SQLite (nothing is lost), otherwise the sample is seeded.
  * Undo/redo history is per-session and resets when switching trees.
  */
 
@@ -26,6 +35,9 @@ interface TreeIndex {
   trees: TreeMeta[];
   currentId: string;
 }
+
+/** Which store is authoritative this session. */
+export type Backend = 'connecting' | 'sqlite' | 'local';
 
 const treeKey = (id: string) => (id === 'default' ? LEGACY_KEY : `${LEGACY_KEY}:${id}`);
 
@@ -130,6 +142,12 @@ export interface TreeStore {
   currentTreeId: string;
   canUndo: boolean;
   canRedo: boolean;
+  /** Where data is being stored this session. */
+  backend: Backend;
+  /** True while a save to the DB is in flight. */
+  saving: boolean;
+  /** Set when the DB is unreachable / a save failed (else null). */
+  dbError: string | null;
   /** Apply an undoable edit. */
   apply: (next: TreeData) => void;
   /** Apply a non-undoable change (e.g. focus navigation). */
@@ -145,6 +163,9 @@ export interface TreeStore {
   deleteTree: (id: string) => void;
 }
 
+const OFFLINE_MSG =
+  'Veritabanı sunucusu kapalı — değişiklikler şimdilik tarayıcıda saklanıyor. Kalıcı kayıt için: npm run server';
+
 export function useTreeStore(): TreeStore {
   const [index, setIndex] = useState<TreeIndex>(loadIndex);
   const [state, dispatch] = useReducer(
@@ -156,30 +177,122 @@ export function useTreeStore(): TreeStore {
       future: [],
     }),
   );
+  const [backend, setBackend] = useState<Backend>('connecting');
+  const [saving, setSaving] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+
   // latest values, readable from the stable callbacks below
   const presentRef = useRef(state.present);
   presentRef.current = state.present;
   const indexRef = useRef(index);
   indexRef.current = index;
+  const backendRef = useRef(backend);
+  const readyRef = useRef(false); // gate persistence until initial hydrate settles
 
-  // persist current tree (lightly debounced) + keep index name in sync
+  // keep backendRef current (effect-synced; it only changes once after connect)
   useEffect(() => {
+    backendRef.current = backend;
+  }, [backend]);
+
+  // one-time hydrate from the SQLite backend (or fall back to localStorage)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const up = await pingBackend();
+      if (cancelled) return;
+      if (!up) {
+        setBackend('local');
+        setDbError(OFFLINE_MSG);
+        readyRef.current = true;
+        return;
+      }
+      try {
+        let serverTrees = await remoteList();
+        if (serverTrees.length === 0) {
+          // empty DB: migrate existing localStorage trees, else seed the sample
+          const local = loadIndex();
+          const migratable = local.trees
+            .map((t) => ({ meta: t, data: loadTreeData(t.id) }))
+            .filter((x) => x.data && Object.keys(x.data.persons).length > 0) as {
+            meta: TreeMeta;
+            data: TreeData;
+          }[];
+          const created: TreeMeta[] = [];
+          let currentId = '';
+          if (migratable.length === 0) {
+            const s = sampleTree();
+            const id = await remoteCreate(s);
+            created.push({ id, name: s.name });
+            currentId = id;
+          } else {
+            for (const m of migratable) {
+              const id = await remoteCreate(m.data);
+              created.push({ id, name: m.data.name });
+              if (m.meta.id === local.currentId) currentId = id;
+            }
+            if (!currentId) currentId = created[0].id;
+          }
+          serverTrees = created;
+          writeJson(INDEX_KEY, { trees: created, currentId });
+          setIndex({ trees: created, currentId });
+        }
+
+        const cachedCurrent = loadIndex().currentId;
+        const currentId = serverTrees.some((t) => t.id === cachedCurrent)
+          ? cachedCurrent
+          : serverTrees[0].id;
+        const data = await remoteGet(currentId);
+        if (cancelled) return;
+        writeJson(treeKey(currentId), data);
+        writeJson(INDEX_KEY, { trees: serverTrees, currentId });
+        setIndex({ trees: serverTrees, currentId });
+        dispatch({ type: 'replace', data });
+        setBackend('sqlite');
+        setDbError(null);
+      } catch (e) {
+        if (cancelled) return;
+        setBackend('local');
+        setDbError('Veritabanına bağlanılamadı — tarayıcı belleği kullanılıyor.');
+        console.warn('DB hydrate failed:', e);
+      } finally {
+        readyRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // persist current tree (debounced): localStorage cache + DB when online
+  useEffect(() => {
+    if (!readyRef.current) return;
+    const id = index.currentId;
+    const data = state.present;
     const t = setTimeout(() => {
-      writeJson(treeKey(index.currentId), state.present);
+      writeJson(treeKey(id), data);
       setIndex((idx) => {
         const entry = idx.trees.find((x) => x.id === idx.currentId);
-        if (entry && entry.name !== state.present.name) {
-          const next = {
+        if (entry && entry.name !== data.name) {
+          return {
             ...idx,
             trees: idx.trees.map((x) =>
-              x.id === idx.currentId ? { ...x, name: state.present.name } : x,
+              x.id === idx.currentId ? { ...x, name: data.name } : x,
             ),
           };
-          return next;
         }
         return idx;
       });
-    }, 250);
+      if (backendRef.current === 'sqlite') {
+        setSaving(true);
+        remotePut(id, data)
+          .then(() => setDbError(null))
+          .catch((e) => {
+            setDbError('Kaydetme başarısız — sunucu kapalı olabilir.');
+            console.warn('DB save failed:', e);
+          })
+          .finally(() => setSaving(false));
+      }
+    }, 350);
     return () => clearTimeout(t);
   }, [state.present, index.currentId]);
 
@@ -201,44 +314,99 @@ export function useTreeStore(): TreeStore {
     if (!idx.trees.some((t) => t.id === id) || idx.currentId === id) return;
     // save the outgoing tree immediately (the debounce may not have fired)
     writeJson(treeKey(idx.currentId), presentRef.current);
-    dispatch({ type: 'replace', data: loadTreeData(id) ?? emptyTree() });
-    setIndex({ ...idx, currentId: id });
+    if (backendRef.current === 'sqlite') {
+      remotePut(idx.currentId, presentRef.current).catch((e) => console.warn(e));
+      remoteGet(id)
+        .then((data) => {
+          writeJson(treeKey(id), data);
+          dispatch({ type: 'replace', data });
+          setIndex({ ...indexRef.current, currentId: id });
+        })
+        .catch((e) => {
+          setDbError('Ağaç yüklenemedi.');
+          console.warn(e);
+        });
+    } else {
+      dispatch({ type: 'replace', data: loadTreeData(id) ?? emptyTree() });
+      setIndex({ ...idx, currentId: id });
+    }
   }, []);
 
   const createTree = useCallback((data?: TreeData) => {
     const idx = indexRef.current;
     const tree = data ?? emptyTree('New Tree');
-    const id = newId('T');
-    writeJson(treeKey(idx.currentId), presentRef.current);
-    writeJson(treeKey(id), tree);
-    dispatch({ type: 'replace', data: tree });
-    setIndex({ trees: [...idx.trees, { id, name: tree.name }], currentId: id });
+    if (backendRef.current === 'sqlite') {
+      remotePut(idx.currentId, presentRef.current).catch((e) => console.warn(e));
+      remoteCreate(tree)
+        .then((id) => {
+          writeJson(treeKey(id), tree);
+          dispatch({ type: 'replace', data: tree });
+          setIndex({
+            trees: [...indexRef.current.trees, { id, name: tree.name }],
+            currentId: id,
+          });
+        })
+        .catch((e) => {
+          setDbError('Ağaç oluşturulamadı.');
+          console.warn(e);
+        });
+    } else {
+      const id = newId('T');
+      writeJson(treeKey(idx.currentId), presentRef.current);
+      writeJson(treeKey(id), tree);
+      dispatch({ type: 'replace', data: tree });
+      setIndex({ trees: [...idx.trees, { id, name: tree.name }], currentId: id });
+    }
   }, []);
 
   const deleteTree = useCallback((id: string) => {
     const idx = indexRef.current;
     if (!idx.trees.some((t) => t.id === id)) return;
+    const sqlite = backendRef.current === 'sqlite';
+    if (sqlite) remoteDelete(id).catch((e) => console.warn('DB delete failed:', e));
     try {
       localStorage.removeItem(treeKey(id));
     } catch {
       /* non-fatal */
     }
-    let trees = idx.trees.filter((t) => t.id !== id);
-    let currentId = idx.currentId;
-    if (currentId === id) {
-      if (trees.length === 0) {
-        const fresh = emptyTree();
+    const trees = idx.trees.filter((t) => t.id !== id);
+
+    if (idx.currentId !== id) {
+      setIndex({ trees, currentId: idx.currentId });
+      return;
+    }
+    // deleting the open tree → switch to another, or start fresh
+    if (trees.length === 0) {
+      const fresh = emptyTree();
+      if (sqlite) {
+        remoteCreate(fresh)
+          .then((freshId) => {
+            writeJson(treeKey(freshId), fresh);
+            dispatch({ type: 'replace', data: fresh });
+            setIndex({ trees: [{ id: freshId, name: fresh.name }], currentId: freshId });
+          })
+          .catch((e) => console.warn(e));
+      } else {
         const freshId = newId('T');
         writeJson(treeKey(freshId), fresh);
-        trees = [{ id: freshId, name: fresh.name }];
-        currentId = freshId;
         dispatch({ type: 'replace', data: fresh });
-      } else {
-        currentId = trees[0].id;
-        dispatch({ type: 'replace', data: loadTreeData(currentId) ?? emptyTree() });
+        setIndex({ trees: [{ id: freshId, name: fresh.name }], currentId: freshId });
       }
+      return;
     }
-    setIndex({ trees, currentId });
+    const currentId = trees[0].id;
+    if (sqlite) {
+      remoteGet(currentId)
+        .then((data) => {
+          writeJson(treeKey(currentId), data);
+          dispatch({ type: 'replace', data });
+          setIndex({ trees, currentId });
+        })
+        .catch((e) => console.warn(e));
+    } else {
+      dispatch({ type: 'replace', data: loadTreeData(currentId) ?? emptyTree() });
+      setIndex({ trees, currentId });
+    }
   }, []);
 
   return useMemo(
@@ -248,6 +416,9 @@ export function useTreeStore(): TreeStore {
       currentTreeId: index.currentId,
       canUndo: state.past.length > 0,
       canRedo: state.future.length > 0,
+      backend,
+      saving,
+      dbError,
       apply,
       applyTransient,
       replace,
@@ -257,6 +428,20 @@ export function useTreeStore(): TreeStore {
       createTree,
       deleteTree,
     }),
-    [state, index, apply, applyTransient, replace, undo, redo, switchTree, createTree, deleteTree],
+    [
+      state,
+      index,
+      backend,
+      saving,
+      dbError,
+      apply,
+      applyTransient,
+      replace,
+      undo,
+      redo,
+      switchTree,
+      createTree,
+      deleteTree,
+    ],
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { TreeData } from '../types';
 import { fullName, lifespan } from '../types';
 import { searchPersons } from '../model/queries';
-import type { TreeMeta } from '../store/useTreeStore';
+import type { Backend, TreeMeta } from '../store/useTreeStore';
 
 export type ViewMode = 'hourglass' | 'pedigree' | 'descendants' | 'fan' | 'timeline';
 
@@ -16,6 +16,8 @@ interface Props {
   descendantDepth: number;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  backend: Backend;
+  saving: boolean;
   health: string | null;
   healthOptions: { name: string; count: number }[];
   onHealthChange: (name: string | null) => void;
@@ -39,6 +41,34 @@ interface Props {
 
 const DEPTHS = [1, 2, 3, 4, 5, 99];
 const depthLabel = (n: number) => (n === 99 ? 'All' : String(n));
+
+function StorageBadge({ backend, saving }: { backend: Backend; saving: boolean }) {
+  if (backend === 'connecting') {
+    return (
+      <span className="storage-badge connecting" title="Connecting to the local database…">
+        ⛁ …
+      </span>
+    );
+  }
+  if (backend === 'local') {
+    return (
+      <span
+        className="storage-badge warn"
+        title="Database server is off — data is only in this browser. Run: npm run server"
+      >
+        ⚠ Browser only
+      </span>
+    );
+  }
+  return (
+    <span
+      className="storage-badge ok"
+      title="Saved to the local SQLite database on disk (server/data/family_tree.db)"
+    >
+      ⛁ SQLite{saving ? ' · saving…' : ''}
+    </span>
+  );
+}
 
 const VIEW_MODES: { id: ViewMode; icon: string; label: string }[] = [
   { id: 'hourglass', icon: '⧖', label: 'Hourglass — ancestors & descendants' },
@@ -140,6 +170,7 @@ export function Toolbar(props: Props) {
           )}
         </div>
         <span className="person-count">{Object.keys(props.data.persons).length} people</span>
+        <StorageBadge backend={props.backend} saving={props.saving} />
       </div>
 
       <div className="toolbar-search">

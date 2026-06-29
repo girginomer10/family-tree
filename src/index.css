@@ -86,6 +86,27 @@ body {
   font-size: 12.5px;
   white-space: nowrap;
 }
+.storage-badge {
+  font-size: 11.5px;
+  padding: 2px 9px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+  cursor: default;
+}
+.storage-badge.ok {
+  color: #2f8f83;
+  border-color: #bfe3dd;
+  background: #e3f2ef;
+}
+.storage-badge.warn {
+  color: #9a6a1e;
+  border-color: #f0d9b5;
+  background: #fdeede;
+}
+.storage-badge.connecting {
+  color: var(--muted);
+}
 
 .toolbar-search {
   position: relative;
@@ -395,6 +416,10 @@ body {
   z-index: 100;
   box-shadow: 0 6px 20px rgba(40, 35, 20, 0.25);
   max-width: 70%;
+}
+.banner.warn {
+  top: 56px;
+  background: #7a4f14;
 }
 
 /* ---------- empty state ---------- */

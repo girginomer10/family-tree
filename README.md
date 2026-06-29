@@ -70,6 +70,30 @@ npm run build      # type-check + production build
 npm run smoke      # ~160 logic checks: model, layouts, kinship, GEDCOM round-trip
 ```
 
+## Persistence (local SQLite)
+
+By default the app is fully client-side and autosaves to the browser's
+`localStorage`. For real, durable storage there's an optional **local SQLite
+backend** — a real `family_tree.db` file on your own disk, no cloud, no account:
+
+```bash
+npm run server     # SQLite API on :3001 (Node's built-in node:sqlite — no native deps)
+npm run dev        # in another terminal — Vite proxies /api to the backend
+# or run both at once:
+npm run start
+```
+
+- The database file lives at `server/data/family_tree.db` (gitignored — it's *your* data).
+  Back it up by copying that file, or use **File ▸ Export JSON/GEDCOM**.
+- The schema is fully normalized (`persons`, `unions`, `conditions`, …), so it's
+  genuine queryable SQL: `SELECT name, COUNT(*) FROM conditions GROUP BY name;`
+- A badge in the toolbar shows where data is going: **⛁ SQLite** when the backend
+  is reachable, **⚠ Browser only** when it isn't (it then falls back to
+  `localStorage` and never blocks you).
+- First time you connect to an empty database, any trees already in `localStorage`
+  are migrated in automatically — nothing is lost.
+- `npm run db:roundtrip` verifies a tree survives a save→load cycle byte-for-byte.
+
 ## Architecture
 
 ```
@@ -85,13 +109,20 @@ src/
     fan.ts               Ancestor fan chart geometry (ahnentafel slots -> SVG sectors)
     timeline.ts          Lifespan-bar timeline layout (decade grid, marriage markers)
   gedcom/gedcom.ts       GEDCOM 5.5.1 import (FAM records authoritative) and export
-  store/useTreeStore.ts  Multi-tree store: tree index + per-tree localStorage autosave,
-                         per-session undo/redo history
+  store/
+    useTreeStore.ts      Multi-tree store: SQLite-backed when the server is up,
+                         localStorage cache/fallback, per-session undo/redo history
+    backend.ts           Client for the local SQLite REST API (/api)
   data/sample.ts         Demo family
   utils/files.ts         Download/read files, SVG serialization, SVG->PNG, photo downscaling
   components/            Toolbar, ZoomCanvas (shared pan/zoom), TreeCanvas, FanChartView,
                          TimelineView, PersonCard, Sidebar, person/union/relationship/stats modals
-scripts/smoke.ts         Headless checks: model invariants, layout overlap tests, GEDCOM round-trip
+server/
+  db.js                  SQLite schema + TreeData<->rows mapping (node:sqlite, no native deps)
+  index.js               Dependency-free REST API over the database
+scripts/
+  smoke.ts               Headless checks: model invariants, layout overlap tests, GEDCOM round-trip
+  db-roundtrip.ts        Asserts a tree survives a DB save->load cycle byte-for-byte
 ```
 
 ### Data model

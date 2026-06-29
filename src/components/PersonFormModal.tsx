@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FuzzyDate, Gender, Person, TreeData } from '../types';
-import { fullName, lifespan } from '../types';
+import type {
+  ConditionStatus,
+  FuzzyDate,
+  Gender,
+  HealthCondition,
+  Person,
+  TreeData,
+} from '../types';
+import { CONDITION_STATUS_LABEL, fullName, lifespan } from '../types';
 import type { PersonDraft } from '../model/mutations';
 import { searchPersons } from '../model/queries';
 import { fileToDataUrl } from '../utils/files';
@@ -93,6 +100,103 @@ function DateFields({
 }
 
 // ---------------------------------------------------------------------------
+// Health conditions editor
+
+const CONDITION_STATUSES: ConditionStatus[] = [
+  'active',
+  'managed',
+  'resolved',
+  'cause-of-death',
+];
+
+function ConditionsEditor({
+  value,
+  onChange,
+}: {
+  value: HealthCondition[];
+  onChange: (v: HealthCondition[]) => void;
+}) {
+  const update = (i: number, patch: Partial<HealthCondition>) =>
+    onChange(value.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+  const remove = (i: number) => onChange(value.filter((_, j) => j !== i));
+  const add = () => onChange([...value, { name: '' }]);
+
+  return (
+    <div className="conditions-editor">
+      {value.map((c, i) => (
+        <div key={i} className="condition-edit">
+          <div className="condition-edit-main">
+            <input
+              type="text"
+              placeholder="Condition / illness"
+              value={c.name}
+              onChange={(e) => update(i, { name: e.target.value })}
+            />
+            <select
+              value={c.status ?? ''}
+              title="Status"
+              onChange={(e) =>
+                update(i, {
+                  status: e.target.value ? (e.target.value as ConditionStatus) : undefined,
+                })
+              }
+            >
+              <option value="">status…</option>
+              {CONDITION_STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {CONDITION_STATUS_LABEL[st]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="icon-btn danger"
+              title="Remove condition"
+              onClick={() => remove(i)}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="condition-edit-meta">
+            <label className={c.hereditary ? 'chip active' : 'chip'} title="Heritable condition">
+              <input
+                type="checkbox"
+                checked={!!c.hereditary}
+                onChange={(e) => update(i, { hereditary: e.target.checked })}
+              />
+              ⚕ hereditary
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={120}
+              placeholder="onset age"
+              title="Age at onset / diagnosis"
+              value={c.ageAtOnset != null ? String(c.ageAtOnset) : ''}
+              onChange={(e) =>
+                update(i, {
+                  ageAtOnset: e.target.value.trim() ? parseInt(e.target.value, 10) : undefined,
+                })
+              }
+              style={{ width: 92 }}
+            />
+            <input
+              type="text"
+              placeholder="note (optional)"
+              value={c.notes ?? ''}
+              onChange={(e) => update(i, { notes: e.target.value || undefined })}
+            />
+          </div>
+        </div>
+      ))}
+      <button type="button" className="btn small ghost" onClick={add}>
+        + Add condition
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Person form modal
 
 export interface PersonFormResult {
@@ -149,6 +253,9 @@ export function PersonFormModal({
   const [photoUrl, setPhotoUrl] = useState(initial?.photoUrl ?? '');
   const [photoError, setPhotoError] = useState('');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [conditions, setConditions] = useState<HealthCondition[]>(
+    initial?.conditions ? initial.conditions.map((c) => ({ ...c })) : [],
+  );
   const [query, setQuery] = useState('');
   const photoFileRef = useRef<HTMLInputElement>(null);
 
@@ -196,6 +303,12 @@ export function PersonFormModal({
       occupation: occupation.trim() || undefined,
       photoUrl: photoUrl.trim() || undefined,
       notes: notes.trim() || undefined,
+      conditions: (() => {
+        const cleaned = conditions
+          .map((c) => ({ ...c, name: c.name.trim() }))
+          .filter((c) => c.name);
+        return cleaned.length ? cleaned : undefined;
+      })(),
     };
     onSubmit({
       draft,
@@ -396,6 +509,11 @@ export function PersonFormModal({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
+            </div>
+
+            <div className="form-section">
+              <span className="form-section-label">⚕ Health conditions</span>
+              <ConditionsEditor value={conditions} onChange={setConditions} />
             </div>
 
             <div className="modal-actions">

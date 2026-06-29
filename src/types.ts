@@ -27,6 +27,29 @@ export interface LifeEvent {
   place?: string;
 }
 
+/** Clinical status of a recorded condition. */
+export type ConditionStatus = 'active' | 'managed' | 'resolved' | 'cause-of-death';
+
+/**
+ * A health condition / illness recorded for a person. `hereditary` marks
+ * heritable conditions so they can be traced through bloodlines.
+ */
+export interface HealthCondition {
+  name: string;
+  hereditary?: boolean;
+  status?: ConditionStatus;
+  /** Age (years) at onset / diagnosis, if known. */
+  ageAtOnset?: number;
+  notes?: string;
+}
+
+export const CONDITION_STATUS_LABEL: Record<ConditionStatus, string> = {
+  active: 'active',
+  managed: 'managed',
+  resolved: 'resolved',
+  'cause-of-death': 'cause of death',
+};
+
 export interface Person {
   id: string;
   givenName: string;
@@ -37,6 +60,8 @@ export interface Person {
   isDeceased?: boolean; // a death event also implies deceased
   occupation?: string;
   notes?: string;
+  /** Recorded illnesses / health conditions. */
+  conditions?: HealthCondition[];
   photoUrl?: string;
   /** Unions in which this person is a partner (~GEDCOM FAMS). */
   unionsAsPartner: string[];
@@ -136,4 +161,20 @@ export function lifespan(p: Person): string {
 
 export function isAlive(p: Person): boolean {
   return !p.isDeceased && !p.death;
+}
+
+/** True if the person carries at least one condition flagged hereditary. */
+export function hasHereditaryCondition(p: Person): boolean {
+  return !!p.conditions?.some((c) => c.hereditary);
+}
+
+/** Compact one-line summary of a condition, e.g. "Diabetes · managed · onset 45". */
+export function conditionSummary(c: HealthCondition): string {
+  return [
+    c.name,
+    c.status ? CONDITION_STATUS_LABEL[c.status] : '',
+    c.ageAtOnset != null ? `onset ${c.ageAtOnset}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }

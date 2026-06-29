@@ -1053,3 +1053,115 @@ button.rel-link:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ---------- health conditions ---------- */
+:root {
+  --health: #2f8f83;
+  --health-soft: #e3f2ef;
+}
+
+/* form: conditions editor */
+.form-section {
+  margin-top: 10px;
+}
+.form-section-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.conditions-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.condition-edit {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fbfaf7;
+}
+.condition-edit-main,
+.condition-edit-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.condition-edit-main input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+.condition-edit-meta input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+.condition-edit .chip {
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+/* sidebar: condition list */
+.condition-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.condition-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.condition-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.condition-dna {
+  color: var(--health);
+  font-weight: 700;
+}
+.condition-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.condition-status {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--line);
+  color: var(--muted);
+}
+.condition-status.st-active {
+  background: #fdeede;
+  color: #9a6a1e;
+}
+.condition-status.st-managed {
+  background: var(--health-soft);
+  color: var(--health);
+}
+.condition-status.st-resolved {
+  background: #eceafa;
+  color: var(--accent);
+}
+.condition-status.st-cause-of-death {
+  background: #f6e1dc;
+  color: var(--danger);
+}
+.condition-sub {
+  font-size: 12px;
+  color: var(--muted);
+}

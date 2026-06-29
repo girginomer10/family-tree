@@ -1,4 +1,11 @@
-import type { Gender, LifeEvent, TreeData, Union, UnionStatus } from '../types';
+import type {
+  Gender,
+  HealthCondition,
+  LifeEvent,
+  TreeData,
+  Union,
+  UnionStatus,
+} from '../types';
 import { emptyTree } from '../types';
 
 /**
@@ -16,6 +23,7 @@ interface P {
   b?: LifeEvent;
   d?: LifeEvent;
   occ?: string;
+  cond?: HealthCondition[];
 }
 
 const y = (year: number, place?: string): LifeEvent => ({
@@ -25,17 +33,38 @@ const y = (year: number, place?: string): LifeEvent => ({
 
 const PERSONS: P[] = [
   // great-grandparents
-  { id: 'ibrahim', given: 'İbrahim', sur: 'Yılmaz', g: 'M', b: y(1900, 'Konya'), d: y(1970) },
-  { id: 'hatice', given: 'Hatice', sur: 'Yılmaz', g: 'F', b: y(1908, 'Konya'), d: y(1985) },
+  {
+    id: 'ibrahim', given: 'İbrahim', sur: 'Yılmaz', g: 'M', b: y(1900, 'Konya'), d: y(1970),
+    cond: [{ name: 'Type 2 Diabetes', hereditary: true, status: 'cause-of-death', ageAtOnset: 55 }],
+  },
+  {
+    id: 'hatice', given: 'Hatice', sur: 'Yılmaz', g: 'F', b: y(1908, 'Konya'), d: y(1985),
+    cond: [{ name: 'Glaucoma', hereditary: true, status: 'managed' }],
+  },
   // grandparents
-  { id: 'mehmet', given: 'Mehmet', sur: 'Yılmaz', g: 'M', b: y(1928, 'Konya'), d: y(1995, 'Ankara'), occ: 'Farmer' },
+  {
+    id: 'mehmet', given: 'Mehmet', sur: 'Yılmaz', g: 'M', b: y(1928, 'Konya'), d: y(1995, 'Ankara'), occ: 'Farmer',
+    cond: [
+      { name: 'Type 2 Diabetes', hereditary: true, status: 'managed', ageAtOnset: 58 },
+      { name: 'Hypertension', status: 'managed' },
+    ],
+  },
   { id: 'fatma', given: 'Fatma', sur: 'Yılmaz', g: 'F', b: y(1932, 'Konya'), d: y(2010, 'Ankara') },
-  { id: 'hasan', given: 'Hasan', sur: 'Demir', g: 'M', b: y(1930, 'İzmir'), d: y(2001, 'İzmir'), occ: 'Teacher' },
+  {
+    id: 'hasan', given: 'Hasan', sur: 'Demir', g: 'M', b: y(1930, 'İzmir'), d: y(2001, 'İzmir'), occ: 'Teacher',
+    cond: [{ name: 'Coronary artery disease', status: 'cause-of-death', ageAtOnset: 68 }],
+  },
   { id: 'ayse', given: 'Ayşe', sur: 'Demir', g: 'F', b: y(1936, 'İzmir') },
   // parents' generation
-  { id: 'ahmet', given: 'Ahmet', sur: 'Yılmaz', g: 'M', b: y(1955, 'Ankara'), occ: 'Engineer' },
+  {
+    id: 'ahmet', given: 'Ahmet', sur: 'Yılmaz', g: 'M', b: y(1955, 'Ankara'), occ: 'Engineer',
+    cond: [{ name: 'Type 2 Diabetes', hereditary: true, status: 'active', ageAtOnset: 60 }],
+  },
   { id: 'zeynep', given: 'Zeynep', sur: 'Kaya', g: 'F', b: y(1957, 'Ankara') },
-  { id: 'elif', given: 'Elif', sur: 'Yılmaz', g: 'F', b: y(1958, 'İzmir'), occ: 'Doctor' },
+  {
+    id: 'elif', given: 'Elif', sur: 'Yılmaz', g: 'F', b: y(1958, 'İzmir'), occ: 'Doctor',
+    cond: [{ name: 'Asthma', status: 'managed', ageAtOnset: 12 }],
+  },
   { id: 'hulya', given: 'Hülya', sur: 'Yılmaz', g: 'F', b: y(1959, 'Ankara') },
   { id: 'mustafa', given: 'Mustafa', sur: 'Demir', g: 'M', b: y(1961, 'İzmir') },
   { id: 'leyla', given: 'Leyla', sur: 'Demir', g: 'F', b: y(1963, 'Bursa') },
@@ -87,6 +116,7 @@ export function sampleTree(): TreeData {
       ...(p.b ? { birth: p.b } : {}),
       ...(p.d ? { death: p.d, isDeceased: true } : {}),
       ...(p.occ ? { occupation: p.occ } : {}),
+      ...(p.cond ? { conditions: p.cond } : {}),
     };
   }
   for (const u of UNIONS) {

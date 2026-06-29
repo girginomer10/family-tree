@@ -1,5 +1,5 @@
 import type { Person } from '../types';
-import { fullName, lifespan } from '../types';
+import { fullName, hasHereditaryCondition, lifespan } from '../types';
 import type { PlacedCard } from '../layout/layout';
 import { CARD_H, CARD_W } from '../layout/layout';
 
@@ -35,6 +35,10 @@ export function PersonCard({ placed, person, isSelected, onSelect, onFocus }: Pr
   const focus = placed.isFocus;
   const stub = placed.isStub;
   const dead = !!person.isDeceased || !!person.death;
+  const hereditary = hasHereditaryCondition(person);
+  const hereditaryNames = hereditary
+    ? person.conditions!.filter((c) => c.hereditary).map((c) => c.name).join(', ')
+    : '';
 
   const border = focus ? FOCUS : isSelected ? '#8a82c4' : c.stroke;
   const borderW = focus ? 2.5 : isSelected ? 2 : 1.25;
@@ -119,6 +123,14 @@ export function PersonCard({ placed, person, isSelected, onSelect, onFocus }: Pr
         <circle cx={cx + 19} cy={24} r={5.5} fill="#736e64">
           <title>Deceased</title>
         </circle>
+      )}
+      {hereditary && (
+        <g>
+          <title>{`Hereditary: ${hereditaryNames}`}</title>
+          <circle cx={cx - 19} cy={24} r={7} fill="#2f8f83" stroke="#fff" strokeWidth={1} />
+          <rect x={cx - 20} y={20.5} width={2} height={7} rx={1} fill="#fff" />
+          <rect x={cx - 22.5} y={23} width={7} height={2} rx={1} fill="#fff" />
+        </g>
       )}
 
       {/* name */}

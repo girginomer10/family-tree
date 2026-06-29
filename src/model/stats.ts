@@ -19,6 +19,9 @@ export interface TreeStats {
   topSurnames: { name: string; count: number }[];
   topGivenNames: { name: string; count: number }[];
   topBirthPlaces: { name: string; count: number }[];
+  topConditions: { name: string; count: number }[];
+  withConditions: number;
+  hereditaryCarriers: number;
   withPhotos: number;
   withBirthDates: number;
 }
@@ -51,6 +54,9 @@ export function computeStats(data: TreeData, currentYear: number): TreeStats {
   const decades = new Map<number, number>();
   let withPhotos = 0;
   let withBirthDates = 0;
+  let withConditions = 0;
+  let hereditaryCarriers = 0;
+  const conditionNames: string[] = [];
 
   const consider = (p: Person) => {
     if (p.gender === 'M') male++;
@@ -58,6 +64,11 @@ export function computeStats(data: TreeData, currentYear: number): TreeStats {
     else unknownGender++;
     if (isAlive(p)) living++;
     if (p.photoUrl) withPhotos++;
+    if (p.conditions?.length) {
+      withConditions++;
+      if (p.conditions.some((c) => c.hereditary)) hereditaryCarriers++;
+      for (const c of p.conditions) conditionNames.push(c.name);
+    }
 
     const b = p.birth?.date?.year;
     const d = p.death?.date?.year;
@@ -106,6 +117,9 @@ export function computeStats(data: TreeData, currentYear: number): TreeStats {
     topSurnames: topCounts(persons.map((p) => p.surname), 5),
     topGivenNames: topCounts(persons.map((p) => p.givenName), 5),
     topBirthPlaces: topCounts(persons.map((p) => p.birth?.place ?? ''), 5),
+    topConditions: topCounts(conditionNames, 5),
+    withConditions,
+    hereditaryCarriers,
     withPhotos,
     withBirthDates,
   };

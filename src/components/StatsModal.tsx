@@ -90,6 +90,17 @@ export function StatsModal({ data, onSelect, onClose }: Props) {
             </span>
             <span className="stat-label">with birth dates</span>
           </div>
+          {s.withConditions > 0 && (
+            <div className="stat-card">
+              <span className="stat-num">
+                {s.withConditions}
+                {s.hereditaryCarriers ? ` / ${s.hereditaryCarriers}⚕` : ''}
+              </span>
+              <span className="stat-label">
+                with conditions{s.hereditaryCarriers ? ' / hereditary' : ''}
+              </span>
+            </div>
+          )}
         </div>
 
         <dl className="facts stats-facts">
@@ -143,6 +154,18 @@ export function StatsModal({ data, onSelect, onClose }: Props) {
               <h3>Top birth places</h3>
               <ul className="top-list">
                 {s.topBirthPlaces.map((t) => (
+                  <li key={t.name}>
+                    {t.name} <span>{t.count}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {s.topConditions.length > 0 && (
+            <section>
+              <h3>Top conditions</h3>
+              <ul className="top-list">
+                {s.topConditions.map((t) => (
                   <li key={t.name}>
                     {t.name} <span>{t.count}</span>
                   </li>

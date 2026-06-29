@@ -33,7 +33,12 @@ No chart library, no backend — your data never leaves the browser.
 - **Full editing**: add parent / spouse / child / sibling (or link existing people),
   fuzzy dates (`abt. 1890`), photo upload (auto-downscaled to portable data URLs),
   marriage details, sibling reordering, unlink/delete — all with undo/redo (⌘Z).
-- **Statistics dashboard**: lifespans, births per decade, top surnames & birth places.
+- **Health conditions**: record illnesses per person with status (active / managed /
+  resolved / cause of death), age at onset and notes. **Hereditary** conditions are
+  flagged with a ⚕ badge right on the tree card so heritable traits are visible at a
+  glance, and they round-trip through GEDCOM (custom `_MDCL` tag).
+- **Statistics dashboard**: lifespans, births per decade, top surnames, birth places &
+  most common conditions (with hereditary-carrier count).
 - **Multiple trees** with instant switching; imports always land in a new tree.
 - **Import/Export**: GEDCOM 5.5.1 (round-trip tested, interops with Gramps, webtrees,
   Ancestry…), JSON, and the chart itself as SVG or PNG.

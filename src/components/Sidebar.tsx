@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 import type { ChildRelType, Person, TreeData, Union } from '../types';
-import { childRelOf, formatDate, fullName, lifespan } from '../types';
+import {
+  CONDITION_STATUS_LABEL,
+  childRelOf,
+  formatDate,
+  fullName,
+  lifespan,
+} from '../types';
 import { getParents, getSiblings, getUnionsOf } from '../model/queries';
 import { relate } from '../model/kinship';
 
@@ -184,6 +190,41 @@ export function Sidebar(props: Props) {
         <section>
           <h3>Notes</h3>
           <p className="notes">{person.notes}</p>
+        </section>
+      )}
+
+      {person.conditions && person.conditions.length > 0 && (
+        <section>
+          <h3>Health</h3>
+          <ul className="condition-list">
+            {person.conditions.map((c, i) => (
+              <li key={i} className="condition-item">
+                <span className="condition-head">
+                  {c.hereditary && (
+                    <span className="condition-dna" title="Hereditary condition">
+                      ⚕
+                    </span>
+                  )}
+                  <span className="condition-name">{c.name}</span>
+                  {c.status && (
+                    <span className={`condition-status st-${c.status}`}>
+                      {CONDITION_STATUS_LABEL[c.status]}
+                    </span>
+                  )}
+                </span>
+                {(c.ageAtOnset != null || c.notes) && (
+                  <span className="condition-sub">
+                    {[
+                      c.ageAtOnset != null ? `onset age ${c.ageAtOnset}` : '',
+                      c.notes ?? '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

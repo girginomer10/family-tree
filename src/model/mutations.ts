@@ -1,4 +1,12 @@
-import type { ChildRelType, Gender, Person, TreeData, Union, UnionStatus } from '../types';
+import type {
+  ChildRelType,
+  Gender,
+  HealthCondition,
+  Person,
+  TreeData,
+  Union,
+  UnionStatus,
+} from '../types';
 import { newId } from '../types';
 
 /**
@@ -16,6 +24,7 @@ export interface PersonDraft {
   isDeceased?: boolean;
   occupation?: string;
   notes?: string;
+  conditions?: HealthCondition[];
   photoUrl?: string;
 }
 

@@ -1,7 +1,9 @@
 import type {
   ChildRelType,
+  ConditionStatus,
   FuzzyDate,
   Gender,
+  HealthCondition,
   LifeEvent,
   Person,
   TreeData,
@@ -9,6 +11,13 @@ import type {
   UnionStatus,
 } from '../types';
 import { childRelOf, emptyTree } from '../types';
+
+const CONDITION_STATUSES: ConditionStatus[] = [
+  'active',
+  'managed',
+  'resolved',
+  'cause-of-death',
+];
 
 /**
  * GEDCOM 5.5.1 import/export (UTF-8), minimal-but-correct subset:
@@ -168,6 +177,23 @@ export function importGedcom(text: string, name = 'Imported Tree'): GedcomImport
     if (occu) person.occupation = occu;
     const note = childValue(r, 'NOTE');
     if (note) person.notes = note;
+    const conditions: HealthCondition[] = [];
+    for (const mc of r.children.filter((c) => c.tag === '_MDCL')) {
+      const cname = mc.value.trim();
+      if (!cname) continue;
+      const cond: HealthCondition = { name: cname };
+      if (childValue(mc, '_HERED')) cond.hereditary = true;
+      const stat = childValue(mc, '_STAT');
+      if (stat && (CONDITION_STATUSES as string[]).includes(stat)) {
+        cond.status = stat as ConditionStatus;
+      }
+      const onset = childValue(mc, '_ONSET');
+      if (onset && /^\d{1,3}$/.test(onset)) cond.ageAtOnset = parseInt(onset, 10);
+      const cnote = childValue(mc, 'NOTE');
+      if (cnote) cond.notes = cnote;
+      conditions.push(cond);
+    }
+    if (conditions.length) person.conditions = conditions;
     const famcNode = child(r, 'FAMC');
     const pediVal = famcNode ? childValue(famcNode, 'PEDI')?.toLowerCase() : undefined;
     if (pediVal === 'adopted' || pediVal === 'foster' || pediVal === 'step') {
@@ -285,6 +311,18 @@ export function exportGedcom(data: TreeData): string {
       const [head, ...rest] = p.notes.split('\n');
       out(1, 'NOTE', head);
       for (const r of rest) out(2, 'CONT', r);
+    }
+    for (const c of p.conditions ?? []) {
+      if (!c.name) continue;
+      out(1, '_MDCL', c.name);
+      if (c.hereditary) out(2, '_HERED', 'Y');
+      if (c.status) out(2, '_STAT', c.status);
+      if (c.ageAtOnset != null) out(2, '_ONSET', String(c.ageAtOnset));
+      if (c.notes) {
+        const [head, ...rest] = c.notes.split('\n');
+        out(2, 'NOTE', head);
+        for (const r of rest) out(3, 'CONT', r);
+      }
     }
     if (p.unionAsChild && fid.has(p.unionAsChild)) {
       out(1, 'FAMC', `@${fid.get(p.unionAsChild)}@`);
